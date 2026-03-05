@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS naver_credentials (
 -- ============================================================
 -- INDEXES
 -- ============================================================
-CREATE INDEX IF NOT EXISTS idx_drafts_status   ON blog_drafts(status);
-CREATE INDEX IF NOT EXISTS idx_drafts_created  ON blog_drafts(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_images_draft_id ON blog_images(draft_id);
-CREATE INDEX IF NOT EXISTS idx_history_posted  ON post_history(posted_at DESC);
+CREATE INDEX idx_drafts_status   ON blog_drafts(status);
+CREATE INDEX idx_drafts_created  ON blog_drafts(created_at);
+CREATE INDEX idx_images_draft_id ON blog_images(draft_id);
+CREATE INDEX idx_history_posted  ON post_history(posted_at);
