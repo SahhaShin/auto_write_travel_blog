@@ -8,6 +8,7 @@ frontend/.env.local
 backend/target/
 backend/.env
 backend/uploads/
+backend/src/main/resources/application-local.properties
 *.jar
 
 # IDE
