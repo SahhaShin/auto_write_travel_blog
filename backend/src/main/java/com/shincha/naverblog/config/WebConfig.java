@@ -12,14 +12,20 @@ public class WebConfig implements WebMvcConfigurer {
     @Value("${app.upload.dir:./uploads}")
     private String uploadDir;
 
+    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    private String corsOrigins;
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
+        // 환경변수 CORS_ORIGINS 또는 기본값으로 허용
+        String[] origins = corsOrigins.split(",");
         registry.addMapping("/api/**")
-                .allowedOrigins(
-                        "http://localhost:5173",     // Vite dev server
-                        "http://localhost:3000",
-                        "https://*.vercel.app"       // Vercel 배포 도메인
+                .allowedOriginPatterns(
+                        "http://localhost:*",
+                        "https://*.vercel.app",
+                        "https://*.onrender.com"
                 )
+                .allowedOrigins(origins)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true)
@@ -28,7 +34,6 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 업로드된 이미지 파일 서빙
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations("file:" + uploadDir + "/");
     }
