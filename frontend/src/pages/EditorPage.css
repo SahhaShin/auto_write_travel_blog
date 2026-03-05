@@ -1,0 +1,161 @@
+.editor-page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.editor-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  margin-bottom: 16px;
+}
+
+.editor-topbar-left,
+.editor-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.generating-banner {
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 8px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #388e3c;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.success-banner {
+  background: #03c75a;
+  border-radius: 8px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.error-banner {
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  border-radius: 8px;
+  padding: 12px 20px;
+  color: #d32f2f;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.editor-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+.title-input {
+  width: 100%;
+  padding: 24px;
+  font-size: 26px;
+  font-weight: 700;
+  border: none;
+  outline: none;
+  border-bottom: 1px solid #f0f0f0;
+  font-family: inherit;
+  color: #1a1a1a;
+}
+
+.title-input::placeholder {
+  color: #ccc;
+}
+
+.draft-meta {
+  display: flex;
+  gap: 16px;
+  padding: 10px 24px;
+  background: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+  color: #888;
+  flex-wrap: wrap;
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+}
+
+.editor-toolbar button {
+  padding: 5px 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  transition: all 0.15s;
+}
+
+.editor-toolbar button:hover,
+.editor-toolbar button.active {
+  background: #03c75a;
+  color: white;
+  border-color: #03c75a;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: #e0e0e0;
+  margin: 0 4px;
+}
+
+.editor-content-wrapper {
+  padding: 24px;
+  min-height: 500px;
+}
+
+.editor-content-wrapper .ProseMirror {
+  outline: none;
+  line-height: 1.8;
+  font-size: 16px;
+  color: #333;
+}
+
+.editor-content-wrapper .ProseMirror h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 24px 0 12px;
+  color: #1a1a1a;
+}
+
+.editor-content-wrapper .ProseMirror p {
+  margin: 0 0 12px;
+}
+
+.editor-content-wrapper .ProseMirror img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 12px 0;
+}
+
+.editor-content-wrapper .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #bbb;
+  pointer-events: none;
+  height: 0;
+}

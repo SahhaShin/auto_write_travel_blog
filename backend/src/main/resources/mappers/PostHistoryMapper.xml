@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.shincha.naverblog.model.dao.PostHistoryDao">
+
+    <resultMap id="HistoryResultMap" type="PostHistory">
+        <id property="id" column="id"/>
+        <result property="draftId" column="draft_id"/>
+        <result property="naverPostUrl" column="naver_post_url"/>
+        <result property="title" column="title"/>
+        <result property="contentSnapshot" column="content_snapshot"/>
+        <result property="category" column="category"/>
+        <result property="imageCount" column="image_count"/>
+        <result property="postedAt" column="posted_at"/>
+        <result property="automationLog" column="automation_log"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="PostHistory" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO post_history (draft_id, naver_post_url, title, content_snapshot, category, image_count, automation_log)
+        VALUES (#{draftId}, #{naverPostUrl}, #{title}, #{contentSnapshot}, #{category}, #{imageCount}, #{automationLog})
+    </insert>
+
+    <select id="findAll" resultMap="HistoryResultMap">
+        SELECT * FROM post_history ORDER BY posted_at DESC
+    </select>
+
+    <select id="findById" parameterType="long" resultMap="HistoryResultMap">
+        SELECT * FROM post_history WHERE id = #{id}
+    </select>
+
+    <select id="findByDraftId" parameterType="long" resultMap="HistoryResultMap">
+        SELECT * FROM post_history WHERE draft_id = #{draftId} ORDER BY posted_at DESC LIMIT 1
+    </select>
+
+</mapper>

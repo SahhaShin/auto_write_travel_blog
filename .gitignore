@@ -1,0 +1,24 @@
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# Spring Boot / Backend
+backend/target/
+backend/.env
+backend/uploads/
+*.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Claude Code 로컬 설정
+.claude/
+
+# Logs
+*.log
+logs/

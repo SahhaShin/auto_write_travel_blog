@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.shincha.naverblog.model.dao.ImageDao">
+
+    <resultMap id="ImageResultMap" type="BlogImage">
+        <id property="id" column="id"/>
+        <result property="draftId" column="draft_id"/>
+        <result property="originalName" column="original_name"/>
+        <result property="storedPath" column="stored_path"/>
+        <result property="publicUrl" column="public_url"/>
+        <result property="fileSize" column="file_size"/>
+        <result property="mimeType" column="mime_type"/>
+        <result property="aiDescription" column="ai_description"/>
+        <result property="displayOrder" column="display_order"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="BlogImage" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO blog_images (draft_id, original_name, stored_path, public_url, file_size, mime_type, display_order)
+        VALUES (#{draftId}, #{originalName}, #{storedPath}, #{publicUrl}, #{fileSize}, #{mimeType}, #{displayOrder})
+    </insert>
+
+    <select id="findByDraftId" parameterType="long" resultMap="ImageResultMap">
+        SELECT * FROM blog_images WHERE draft_id = #{draftId} ORDER BY display_order
+    </select>
+
+    <select id="findById" parameterType="long" resultMap="ImageResultMap">
+        SELECT * FROM blog_images WHERE id = #{id}
+    </select>
+
+    <update id="updateDraftId">
+        UPDATE blog_images SET draft_id = #{draftId} WHERE id = #{imageId}
+    </update>
+
+    <update id="updateOrder">
+        UPDATE blog_images SET display_order = #{displayOrder} WHERE id = #{imageId}
+    </update>
+
+    <update id="updateAiDescription">
+        UPDATE blog_images SET ai_description = #{description} WHERE id = #{imageId}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM blog_images WHERE id = #{id}
+    </delete>
+
+</mapper>
