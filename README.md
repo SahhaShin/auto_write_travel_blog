@@ -13,7 +13,7 @@
 | Frontend | React 18 + Vite |
 | Backend | Spring Boot 3.2 (Java 17) |
 | Database | MySQL 8 |
-| AI | Claude API (claude-sonnet-4-6) |
+| AI | Claude API (claude-sonnet-4-6) + Gemini 2.5-flash (fallback) |
 | 자동화 | Selenium 4 + WebDriverManager |
 | 에디터 | TipTap (ProseMirror 기반) |
 | 암호화 | AES-256 (Jasypt) |
@@ -26,8 +26,12 @@
 
 1. **스타일 학습** - 기존 네이버 블로그 URL 또는 텍스트를 등록하면 AI가 문체 분석
 2. **AI 글 생성** - 이미지 + 여행 계획 입력 → Claude API가 동일 문체로 한국어 초안 생성
+   - Claude 크레딧 소진 시 **Gemini 2.5-flash 자동 fallback**
 3. **리치 에디터** - TipTap 에디터에서 자유롭게 수정, 3초 자동 저장
 4. **네이버 자동 발행** - Selenium이 네이버 로그인 → SmartEditor ONE에 글 입력 → 발행
+   - **쿠키 세션 재사용** - 최초 로그인 후 세션 쿠키를 AES-256 암호화하여 DB 저장, 이후 자동 재사용
+   - **캡차 대기** - 실제 브라우저 창 실행으로 봇 감지 우회, 캡차 발생 시 사용자가 직접 해결
+   - **2FA(OTP) 지원** - `/api/post/otp/{draftId}` 엔드포인트로 OTP 제출 시 자동 입력
 5. **발행 히스토리** - 발행된 글 목록 및 네이버 URL 관리
 
 ---
@@ -142,6 +146,7 @@ auto-blog/
 | encrypted_id | VARCHAR(500) | AES-256 암호화된 아이디 |
 | encrypted_password | VARCHAR(500) | AES-256 암호화된 비밀번호 |
 | blog_id | VARCHAR(200) | 블로그 URL 경로 ID |
+| session_cookies | MEDIUMTEXT | AES-256 암호화된 로그인 쿠키 JSON (세션 재사용) |
 
 ---
 
@@ -183,8 +188,23 @@ auto-blog/
 |--------|----------|------|
 | POST | `/api/post/{draftId}` | 네이버 자동 발행 시작 (비동기, 202 반환) |
 | GET | `/api/post/status/{draftId}` | 발행 진행 상태 폴링 |
+| POST | `/api/post/otp/{draftId}` | 2FA OTP 제출 (발행 대기 중 호출) |
 | PUT | `/api/credentials` | 네이버 로그인 정보 저장 |
 | GET | `/api/history` | 발행 히스토리 목록 |
+
+**발행 상태값 (`GET /api/post/status/{draftId}` 응답)**
+| 상태 | 의미 |
+|------|------|
+| `PENDING` | 발행 요청 접수 |
+| `LOGGING_IN` | 로그인 진행 중 |
+| `WAITING_CAPTCHA` | 캡차 발생 - 브라우저에서 직접 해결 필요 |
+| `WAITING_2FA` | 2차 인증 대기 - `/api/post/otp/{id}`로 OTP 제출 |
+| `NAVIGATING` | 글쓰기 페이지 이동 중 |
+| `SETTING_TITLE` | 제목 입력 중 |
+| `SETTING_CONTENT` | 본문 입력 중 |
+| `PUBLISHING` | 발행 버튼 클릭 중 |
+| `SUCCESS:{url}` | 발행 완료 (네이버 글 URL 포함) |
+| `FAILED:{msg}` | 실패 (오류 메시지 포함) |
 
 ---
 
@@ -225,8 +245,11 @@ DBeaver에서 `naver_blog_auto` DB 선택 후
 ```properties
 spring.datasource.password=MySQL_비밀번호
 claude.api.key=sk-ant-api03-...
+gemini.api.key=AIzaSy...         # Google AI Studio에서 발급 (무료)
 jasypt.encryptor.password=아무_32자_문자열
 ```
+
+> **Gemini API 키 발급**: [Google AI Studio](https://aistudio.google.com/app/apikey) → Create API key → 프로젝트 없이 발급 (무료 tier)
 
 ### 3. 백엔드 실행
 
@@ -306,11 +329,13 @@ Runtime: Docker (Dockerfile 사용)
 
 ## 주의사항
 
-- **네이버 2단계 인증(OTP)** 이 활성화된 경우 Selenium 자동 포스팅 실패 → 비활성화 권장
+- **네이버 2단계 인증(OTP)** - `/api/post/otp/{draftId}` 엔드포인트로 OTP 제출 지원. 단, 패스키/앱 인증 방식은 미지원
+- **네이버 캡차** - 실제 브라우저 창이 열리므로 캡차 발생 시 직접 해결 가능. 상태 폴링(`WAITING_CAPTCHA`)으로 확인
+- **쿠키 세션** - 최초 로그인 후 쿠키가 DB에 저장되어 이후 로그인 생략. 쿠키 만료 시 재로그인 자동 수행
+- **Claude API 비용**: 포스트 1개당 약 $0.01~$0.05. 크레딧 소진 시 Gemini 2.5-flash로 자동 전환 (무료)
 - **Render 무료 플랜**: 15분 비활성 시 슬립 → 첫 요청 30~60초 대기
 - **Selenium + Chrome**: 메모리 512MB(Render 무료) 환경에서 불안정할 수 있음 → AI 생성/편집 기능은 정상 동작
-- **Claude API 비용**: 포스트 1개당 약 $0.01~$0.05 (4096 tokens 기준)
-- **네이버 SmartEditor ONE** CSS 선택자는 네이버 업데이트 시 변경될 수 있음
+- **네이버 SmartEditor ONE** CSS 선택자는 네이버 업데이트 시 변경될 수 있음 (`NaverAutoPostServiceImpl.java` 수정 필요)
 
 ---
 
