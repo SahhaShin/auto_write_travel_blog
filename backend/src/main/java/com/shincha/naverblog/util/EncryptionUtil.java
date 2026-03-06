@@ -45,11 +45,11 @@ public class EncryptionUtil {
         }
     }
 
-    // AES는 키가 16, 24, 32 바이트여야 함
+    // AES는 키가 16, 24, 32 바이트여야 함 → 항상 32바이트로 맞춤
     private String getPaddedKey(String key) {
         if (key.length() >= 32) return key.substring(0, 32);
         StringBuilder sb = new StringBuilder(key);
-        while (sb.length() < 16) sb.append("0");
+        while (sb.length() < 32) sb.append("0");
         return sb.toString();
     }
 }

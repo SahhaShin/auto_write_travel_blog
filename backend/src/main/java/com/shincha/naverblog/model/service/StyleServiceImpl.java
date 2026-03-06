@@ -38,8 +38,13 @@ public class StyleServiceImpl implements StyleService {
     @Override
     public BlogStyleSample addFromUrl(String url, String category) {
         try {
-            Document doc = Jsoup.connect(url)
-                    .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+            // 네이버 블로그는 iframe 구조 → 모바일 URL로 변환하면 본문 직접 접근 가능
+            String fetchUrl = toMobileNaverUrl(url);
+            log.info("스크래핑 URL: {}", fetchUrl);
+
+            Document doc = Jsoup.connect(fetchUrl)
+                    .userAgent("Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+                    .referrer("https://m.blog.naver.com")
                     .timeout(10000)
                     .get();
 
@@ -67,26 +72,43 @@ public class StyleServiceImpl implements StyleService {
         }
     }
 
+    /**
+     * 네이버 블로그 PC URL을 모바일 URL로 변환
+     * https://blog.naver.com/id/postNo → https://m.blog.naver.com/id/postNo
+     */
+    private String toMobileNaverUrl(String url) {
+        if (url.contains("blog.naver.com") && !url.contains("m.blog.naver.com")) {
+            return url.replace("blog.naver.com", "m.blog.naver.com");
+        }
+        return url;
+    }
+
     private String extractNaverBlogContent(Document doc) {
-        // 네이버 블로그 SmartEditor ONE 본문 영역 시도
+        // 네이버 모바일 블로그 SmartEditor ONE 본문 영역 시도
         String[] selectors = {
                 ".se-main-container",
-                ".post_ct",
                 "#postViewArea",
+                ".post_ct",
                 ".se_doc_viewer",
-                "div.se-component"
+                "div.se-component",
+                "article"
         };
 
         for (String selector : selectors) {
             Element element = doc.selectFirst(selector);
             if (element != null) {
-                return element.text();
+                String text = element.text().trim();
+                if (!text.isBlank()) {
+                    log.info("본문 추출 성공 (selector: {}), 글자수: {}", selector, text.length());
+                    return text;
+                }
             }
         }
 
-        // iframe 내 콘텐츠 시도 (네이버 블로그는 iframe 구조)
-        // 일반 스크래핑으로는 iframe 내부에 접근 불가 → body 전체에서 추출
-        return doc.body().text();
+        // 최후 수단: body 전체 텍스트
+        String bodyText = doc.body().text().trim();
+        log.warn("셀렉터 매칭 실패, body 전체 텍스트 사용, 글자수: {}", bodyText.length());
+        return bodyText;
     }
 
     @Override

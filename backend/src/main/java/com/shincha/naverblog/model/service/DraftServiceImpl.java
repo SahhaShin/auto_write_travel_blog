@@ -31,6 +31,7 @@ public class DraftServiceImpl implements DraftService {
 
     @Override
     public BlogDraft create(BlogDraft draft) {
+        if (draft.getCategory() == null) draft.setCategory("여행");
         draftDao.insert(draft);
         // 임시 업로드된 이미지들을 이 draft에 연결
         if (draft.getImages() != null) {

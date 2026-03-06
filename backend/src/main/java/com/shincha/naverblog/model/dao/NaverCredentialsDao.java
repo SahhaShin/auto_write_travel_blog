@@ -7,4 +7,5 @@ import org.apache.ibatis.annotations.Mapper;
 public interface NaverCredentialsDao {
     NaverCredentials find();
     int upsert(NaverCredentials credentials);
+    int updateCookies(String sessionCookies);
 }

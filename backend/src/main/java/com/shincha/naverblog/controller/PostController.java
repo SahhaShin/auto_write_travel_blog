@@ -38,6 +38,19 @@ public class PostController {
         return ResponseEntity.ok(Map.of("status", status, "draftId", draftId.toString()));
     }
 
+    // 2차 인증 OTP 제출
+    @PostMapping("/api/post/otp/{draftId}")
+    public ResponseEntity<Map<String, String>> submitOtp(
+            @PathVariable Long draftId,
+            @RequestBody Map<String, String> body) {
+        String otp = body.get("otp");
+        if (otp == null || otp.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "OTP를 입력해주세요."));
+        }
+        naverAutoPostService.submitOtp(draftId, otp);
+        return ResponseEntity.ok(Map.of("message", "OTP가 제출되었습니다."));
+    }
+
     // 네이버 자격증명 저장/업데이트
     @PutMapping("/api/credentials")
     public ResponseEntity<?> saveCredentials(@RequestBody Map<String, String> body) {

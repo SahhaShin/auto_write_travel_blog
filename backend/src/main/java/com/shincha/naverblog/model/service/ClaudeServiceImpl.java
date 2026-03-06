@@ -39,6 +39,12 @@ public class ClaudeServiceImpl implements ClaudeService {
     @Value("${claude.api.max-tokens:4096}")
     private int maxTokens;
 
+    @Value("${gemini.api.key:}")
+    private String geminiApiKey;
+
+    @Value("${gemini.api.model:gemini-2.0-flash}")
+    private String geminiModel;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(30))
@@ -69,40 +75,21 @@ public class ClaudeServiceImpl implements ClaudeService {
         String userPrompt = buildUserPrompt(draft, images, customInstructions);
 
         try {
-            String requestBody = buildClaudeRequest(systemPrompt, userPrompt);
-            log.debug("Claude API 요청 시작 - draftId: {}", draftId);
+            String generatedText = callClaude(systemPrompt, userPrompt);
+            return saveGenerated(draftId, generatedText, claudeModel);
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("https://api.anthropic.com/v1/messages"))
-                    .header("Content-Type", "application/json")
-                    .header("x-api-key", claudeApiKey)
-                    .header("anthropic-version", "2023-06-01")
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                    .timeout(Duration.ofSeconds(120))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() != 200) {
-                log.error("Claude API 오류: {} - {}", response.statusCode(), response.body());
-                throw new RuntimeException("Claude API 오류: " + response.statusCode());
+        } catch (CreditExhaustedException e) {
+            log.warn("Claude 크레딧 소진 → Gemini fallback 시도 - draftId: {}", draftId);
+            if (geminiApiKey == null || geminiApiKey.isBlank() || geminiApiKey.equals("여기에_Gemini_API_키_입력")) {
+                throw new RuntimeException("Claude 크레딧이 소진됐고, Gemini API 키도 설정되지 않았습니다.");
             }
-
-            JsonNode responseJson = objectMapper.readTree(response.body());
-            String generatedText = responseJson.path("content").get(0).path("text").asText();
-            int inputTokens = responseJson.path("usage").path("input_tokens").asInt();
-            int outputTokens = responseJson.path("usage").path("output_tokens").asInt();
-
-            // 제목과 본문 분리 (생성된 텍스트에서 첫 줄을 제목으로 사용)
-            String[] parts = generatedText.split("\n", 2);
-            String title = extractTitle(parts[0]);
-            String content = parts.length > 1 ? parts[1].trim() : generatedText;
-
-            // DB에 저장
-            draftDao.updateGenerated(draftId, title, content, claudeModel, inputTokens + outputTokens);
-
-            log.info("Claude 글 생성 완료 - draftId: {}, tokens: {}", draftId, inputTokens + outputTokens);
-            return draftDao.findById(draftId);
+            try {
+                String generatedText = callGemini(systemPrompt, userPrompt);
+                return saveGenerated(draftId, generatedText, geminiModel);
+            } catch (Exception geminiEx) {
+                log.error("Gemini API 호출 실패", geminiEx);
+                throw new RuntimeException("Gemini AI 글 생성에 실패했습니다: " + geminiEx.getMessage());
+            }
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -111,6 +98,85 @@ public class ClaudeServiceImpl implements ClaudeService {
             log.error("Claude API 호출 실패", e);
             throw new RuntimeException("AI 글 생성에 실패했습니다: " + e.getMessage());
         }
+    }
+
+    // Claude 크레딧 소진 감지용 내부 예외
+    private static class CreditExhaustedException extends RuntimeException {
+        CreditExhaustedException(String msg) { super(msg); }
+    }
+
+    private String callClaude(String systemPrompt, String userPrompt) throws Exception {
+        String requestBody = buildClaudeRequest(systemPrompt, userPrompt);
+        log.debug("Claude API 요청 시작");
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://api.anthropic.com/v1/messages"))
+                .header("Content-Type", "application/json")
+                .header("x-api-key", claudeApiKey)
+                .header("anthropic-version", "2023-06-01")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .timeout(Duration.ofSeconds(120))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() != 200) {
+            log.error("Claude API 오류: {} - {}", response.statusCode(), response.body());
+            if (response.body().contains("credit balance is too low") || response.body().contains("insufficient_quota")) {
+                throw new CreditExhaustedException("Claude 크레딧 부족");
+            }
+            throw new RuntimeException("Claude API 오류: " + response.statusCode());
+        }
+
+        JsonNode json = objectMapper.readTree(response.body());
+        log.info("Claude 글 생성 완료 - tokens: {}", json.path("usage").path("input_tokens").asInt() + json.path("usage").path("output_tokens").asInt());
+        return json.path("content").get(0).path("text").asText();
+    }
+
+    private String callGemini(String systemPrompt, String userPrompt) throws Exception {
+        log.debug("Gemini API 요청 시작");
+
+        // Gemini: system + user 를 하나의 contents로 구성
+        var requestMap = new java.util.HashMap<String, Object>();
+        requestMap.put("system_instruction", java.util.Map.of(
+                "parts", List.of(java.util.Map.of("text", systemPrompt))
+        ));
+        requestMap.put("contents", List.of(java.util.Map.of(
+                "parts", List.of(java.util.Map.of("text", userPrompt))
+        )));
+        requestMap.put("generationConfig", java.util.Map.of("maxOutputTokens", maxTokens));
+
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/"
+                + geminiModel + ":generateContent?key=" + geminiApiKey;
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestMap)))
+                .timeout(Duration.ofSeconds(120))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() != 200) {
+            log.error("Gemini API 오류: {} - {}", response.statusCode(), response.body());
+            throw new RuntimeException("Gemini API 오류: " + response.statusCode() + " - " + response.body());
+        }
+
+        JsonNode json = objectMapper.readTree(response.body());
+        String text = json.path("candidates").get(0)
+                .path("content").path("parts").get(0)
+                .path("text").asText();
+        log.info("Gemini 글 생성 완료");
+        return text;
+    }
+
+    private BlogDraft saveGenerated(Long draftId, String generatedText, String model) {
+        String[] parts = generatedText.split("\n", 2);
+        String title = extractTitle(parts[0]);
+        String content = parts.length > 1 ? parts[1].trim() : generatedText;
+        draftDao.updateGenerated(draftId, title, content, model, 0);
+        return draftDao.findById(draftId);
     }
 
     private String buildSystemPrompt(List<BlogStyleSample> styleSamples) {
