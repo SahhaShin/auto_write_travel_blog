@@ -1,5 +1,7 @@
 package com.shincha.naverblog.model.service;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import com.shincha.naverblog.model.dao.ImageDao;
 import com.shincha.naverblog.model.dto.BlogImage;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -27,17 +30,31 @@ public class ImageServiceImpl implements ImageService {
     @Value("${app.upload.dir:./uploads}")
     private String uploadDir;
 
-    @Value("${server.port:8080}")
-    private String serverPort;
+    @Value("${cloudinary.cloud-name:}")
+    private String cloudinaryCloudName;
+
+    @Value("${cloudinary.api-key:}")
+    private String cloudinaryApiKey;
+
+    @Value("${cloudinary.api-secret:}")
+    private String cloudinaryApiSecret;
+
+    private boolean isCloudinaryConfigured() {
+        return cloudinaryCloudName != null && !cloudinaryCloudName.isEmpty()
+                && cloudinaryApiKey != null && !cloudinaryApiKey.isEmpty()
+                && cloudinaryApiSecret != null && !cloudinaryApiSecret.isEmpty();
+    }
+
+    private Cloudinary getCloudinary() {
+        return new Cloudinary(ObjectUtils.asMap(
+                "cloud_name", cloudinaryCloudName,
+                "api_key", cloudinaryApiKey,
+                "api_secret", cloudinaryApiSecret
+        ));
+    }
 
     @Override
     public List<BlogImage> uploadImages(MultipartFile[] files, Long draftId) {
-        // 업로드 디렉토리 생성
-        File uploadPath = new File(uploadDir);
-        if (!uploadPath.exists()) {
-            uploadPath.mkdirs();
-        }
-
         List<BlogImage> savedImages = new ArrayList<>();
 
         for (int i = 0; i < files.length; i++) {
@@ -46,19 +63,37 @@ public class ImageServiceImpl implements ImageService {
 
             try {
                 String originalName = file.getOriginalFilename();
-                String ext = originalName != null && originalName.contains(".")
-                        ? originalName.substring(originalName.lastIndexOf("."))
-                        : ".jpg";
-                String storedName = UUID.randomUUID() + ext;
-                Path storedPath = Paths.get(uploadDir, storedName);
+                String publicUrl;
+                String storedPath;
 
-                Files.copy(file.getInputStream(), storedPath);
+                if (isCloudinaryConfigured()) {
+                    // Cloudinary 업로드
+                    Map uploadResult = getCloudinary().uploader().upload(
+                            file.getBytes(),
+                            ObjectUtils.asMap("folder", "naver-blog")
+                    );
+                    publicUrl = (String) uploadResult.get("secure_url");
+                    storedPath = (String) uploadResult.get("public_id");
+                } else {
+                    // 로컬 폴백 (개발용)
+                    File uploadPath = new File(uploadDir);
+                    if (!uploadPath.exists()) uploadPath.mkdirs();
+
+                    String ext = originalName != null && originalName.contains(".")
+                            ? originalName.substring(originalName.lastIndexOf(".")) : ".jpg";
+                    String storedName = UUID.randomUUID() + ext;
+                    Path localPath = Paths.get(uploadDir, storedName);
+                    Files.copy(file.getInputStream(), localPath);
+
+                    storedPath = localPath.toAbsolutePath().toString();
+                    publicUrl = "/uploads/" + storedName;
+                }
 
                 BlogImage image = new BlogImage();
                 image.setDraftId(draftId);
                 image.setOriginalName(originalName);
-                image.setStoredPath(storedPath.toAbsolutePath().toString());
-                image.setPublicUrl("/uploads/" + storedName);
+                image.setStoredPath(storedPath);
+                image.setPublicUrl(publicUrl);
                 image.setFileSize(file.getSize());
                 image.setMimeType(file.getContentType() != null ? file.getContentType() : "image/jpeg");
                 image.setDisplayOrder(i);
@@ -89,10 +124,9 @@ public class ImageServiceImpl implements ImageService {
     public void delete(Long imageId) {
         BlogImage image = imageDao.findById(imageId);
         if (image != null) {
-            // 파일 시스템에서 삭제
-            File file = new File(image.getStoredPath());
-            if (file.exists()) {
-                file.delete();
+            if (!isCloudinaryConfigured()) {
+                File file = new File(image.getStoredPath());
+                if (file.exists()) file.delete();
             }
             imageDao.deleteById(imageId);
         }
