@@ -2,8 +2,7 @@ services:
   - type: web
     name: naver-blog-backend
     runtime: docker
-    rootDir: backend
-    dockerfilePath: ./backend/Dockerfile
+    dockerfilePath: ./Dockerfile
     plan: free
     envVars:
       - key: DB_URL
