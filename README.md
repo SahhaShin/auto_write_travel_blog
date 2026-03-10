@@ -12,12 +12,12 @@
 |------|------|
 | Frontend | React 18 + Vite |
 | Backend | Spring Boot 3.2 (Java 17) |
-| Database | MySQL 8 |
+| Database | TiDB Cloud Serverless (MySQL 8 호환) |
 | AI | Claude API (claude-sonnet-4-6) + Gemini 2.5-flash (fallback) |
 | 자동화 | Selenium 4 + WebDriverManager |
 | 에디터 | TipTap (ProseMirror 기반) |
 | 암호화 | AES-256 (Jasypt) |
-| 배포 | Frontend → Vercel / Backend → Render |
+| 배포 | Frontend → Vercel / Backend → Render (Docker) |
 | 버전관리 | Git + GitHub |
 
 ---
@@ -208,69 +208,9 @@ auto-blog/
 
 ---
 
-## 로컬 개발 환경 설정
+## 로컬 개발 / 빌드 / 배포
 
-### 사전 요구사항
-- Java 17 (Corretto 17 설치됨: `~/Library/Java/JavaVirtualMachines/corretto-17.0.7`)
-- Maven (`/opt/homebrew/opt/maven/bin/mvn`)
-- Node.js / npm
-- MySQL 8 (DBeaver 또는 MySQL Workbench로 관리)
-
-### 1. MySQL 설정 (DBeaver 사용)
-
-**연결 정보**
-```
-Host: localhost
-Port: 3306
-Username: root
-Password: (본인 설정 비밀번호)
-```
-
-**데이터베이스 생성**
-```sql
-CREATE DATABASE IF NOT EXISTS naver_blog_auto
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-```
-
-**테이블 생성**
-DBeaver에서 `naver_blog_auto` DB 선택 후
-`backend/src/main/resources/schema.sql` 파일 열어서 전체 실행
-
-### 2. 로컬 환경변수 설정
-
-`backend/src/main/resources/application-local.properties` 파일 생성
-(git에 포함되지 않음)
-
-```properties
-spring.datasource.password=MySQL_비밀번호
-claude.api.key=sk-ant-api03-...
-gemini.api.key=AIzaSy...         # Google AI Studio에서 발급 (무료)
-jasypt.encryptor.password=아무_32자_문자열
-```
-
-> **Gemini API 키 발급**: [Google AI Studio](https://aistudio.google.com/app/apikey) → Create API key → 프로젝트 없이 발급 (무료 tier)
-
-### 3. 백엔드 실행
-
-```bash
-cd /Users/shinsanha/Desktop/auto-blog/backend
-
-JAVA_HOME=~/Library/Java/JavaVirtualMachines/corretto-17.0.7/Contents/Home \
-/opt/homebrew/opt/maven/bin/mvn spring-boot:run \
-  -Dspring-boot.run.profiles=local
-```
-
-서버 기동 확인: `http://localhost:8080/api/drafts` → `[]` 반환
-
-### 4. 프론트엔드 실행
-
-```bash
-cd /Users/shinsanha/Desktop/auto-blog/frontend
-npm run dev
-```
-
-브라우저: `http://localhost:5173`
+→ **[DEPLOY.md](./DEPLOY.md)** 참고
 
 ---
 
@@ -296,34 +236,13 @@ npm run dev
 
 ## 배포
 
-### Frontend → Vercel
+| 서비스 | 플랫폼 | URL |
+|--------|--------|-----|
+| Frontend | Vercel | https://frontend-blush-seven-53.vercel.app |
+| Backend | Render (Docker) | https://naver-blog-backend.onrender.com |
+| Database | TiDB Cloud Serverless | ap-southeast-1 |
 
-```
-Root Directory: frontend
-Framework: Vite
-환경변수:
-  VITE_API_BASE_URL = https://naver-blog-backend.onrender.com
-```
-
-### Backend → Render
-
-```
-Root Directory: backend
-Runtime: Docker (Dockerfile 사용)
-환경변수:
-  DB_URL        = jdbc:mysql://호스트:3306/naver_blog_auto?useSSL=true&...
-  DB_USERNAME   = DB사용자명
-  DB_PASSWORD   = DB비밀번호
-  CLAUDE_API_KEY = sk-ant-api03-...
-  AES_SECRET_KEY = 32자_이상_임의_문자열
-  CORS_ORIGINS  = https://your-app.vercel.app
-```
-
-### MySQL → TiDB Cloud (무료 대안)
-
-- [tidbcloud.com](https://tidbcloud.com) 가입 → Free Cluster 생성
-- MySQL 완전 호환, 5GB 무료
-- 연결 정보를 Render 환경변수에 설정
+→ 상세 배포 절차는 **[DEPLOY.md](./DEPLOY.md)** 참고
 
 ---
 
@@ -366,6 +285,7 @@ git push
 |------|-------------|
 | Java 17 | `~/Library/Java/JavaVirtualMachines/corretto-17.0.7` |
 | Maven | `/opt/homebrew/opt/maven/bin/mvn` |
-| MySQL | `/opt/homebrew/bin/mysql` (ver 8.1.0) |
+| MySQL (로컬) | `/opt/homebrew/bin/mysql` (ver 8.1.0) |
+| MySQL (프로덕션) | TiDB Cloud Serverless (ap-southeast-1) |
 | Node | npm 사용 가능 |
 | DB 관리 도구 | DBeaver |
