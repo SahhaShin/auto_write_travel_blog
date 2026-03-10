@@ -3,7 +3,7 @@ services:
     name: naver-blog-backend
     runtime: docker
     rootDir: backend
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./backend/Dockerfile
     plan: free
     envVars:
       - key: DB_URL
