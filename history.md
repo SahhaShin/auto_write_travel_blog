@@ -191,7 +191,63 @@ URL이 postwrite에서 변경될 때까지 최대 15초 대기
 
 ---
 
-## 현재 상태 (2026-03-06 기준)
+---
+
+## 2026-03-10 | 첫 배포 (Vercel + Render + TiDB Cloud)
+
+### 배경
+
+로컬 개발 완료 후 프로덕션 배포 진행
+
+### 배포 구성
+
+| 서비스 | 플랫폼 | URL |
+|--------|--------|-----|
+| Frontend | Vercel | https://frontend-blush-seven-53.vercel.app |
+| Backend | Render (Docker, Free) | https://naver-blog-backend.onrender.com |
+| Database | TiDB Cloud Serverless (Free) | gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000 |
+
+### 해결한 문제들
+
+**1. 프론트엔드 빌드 - Java 버전 문제**
+- 로컬 기본 Java가 11인데 프로젝트는 17 필요
+- 해결: `JAVA_HOME=~/Library/Java/JavaVirtualMachines/corretto-17.0.7/Contents/Home` 지정하여 빌드
+
+**2. Vercel 환경변수 누락 → Network Error**
+- `VITE_API_BASE_URL` 미설정으로 프론트가 `localhost:8080`으로 요청
+- 해결: `vercel env add VITE_API_BASE_URL production` 으로 Render URL 등록 후 재배포
+
+**3. Render Dockerfile 경로 오류**
+- `render.yaml`의 `dockerfilePath: ./Dockerfile`이 repo 루트 기준으로 해석됨
+- 기존엔 루트에 Dockerfile 없어서 `failed to read dockerfile` 에러
+- 해결: repo 루트에 Dockerfile 생성 (COPY 경로를 `backend/` 기준으로 수정), `render.yaml`에서 `rootDir: backend` 제거
+
+**4. Render 환경변수 미설정 → DB 연결 실패 (500 에러)**
+- `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` 등 환경변수 전부 비어있었음
+- TiDB Cloud Serverless Free Cluster 신규 생성 (ap-southeast-1)
+- `naver_blog_auto` 데이터베이스 및 테이블 5개 수동 생성 (schema.sql 실행)
+- Render Environment 탭에 환경변수 설정 후 재배포 → 정상 동작 확인
+
+### Render 환경변수 목록
+
+| Key | 비고 |
+|-----|------|
+| `DB_URL` | TiDB Cloud JDBC URL (useSSL=true, port 4000) |
+| `DB_USERNAME` | TiDB 사용자명 |
+| `DB_PASSWORD` | TiDB 비밀번호 |
+| `AES_SECRET_KEY` | 32자 이상 임의 문자열 |
+| `CORS_ORIGINS` | Vercel 프론트 URL |
+| `UPLOAD_DIR` | `/app/uploads` (render.yaml에 고정) |
+
+### 주의사항
+
+- Render 무료 플랜: 15분 비활성 시 슬립 → 첫 요청 50초+ 지연
+- `spring.sql.init.mode` 미설정 → schema.sql 자동 실행 안됨, 수동 실행 필요
+- `render.yaml` 변경이 기존 서비스 대시보드 설정을 override 하지 않는 경우 있음 → 대시보드에서 직접 확인 필요
+
+---
+
+## 현재 상태 (2026-03-10 기준)
 
 | 기능 | 상태 |
 |------|------|
@@ -203,5 +259,6 @@ URL이 postwrite에서 변경될 때까지 최대 15초 대기
 | 캡차/2FA 대기 | 완료 |
 | Selenium 자동 발행 - 발행 버튼 | 수정 중 |
 | 발행 완료 URL 저장 | 발행 성공 후 확인 필요 |
+| 프로덕션 배포 (Vercel + Render + TiDB) | 완료 |
 
 ---
