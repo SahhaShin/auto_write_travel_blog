@@ -71,16 +71,15 @@ insertBtn.addEventListener('click', async () => {
     const title   = draft.finalTitle || draft.generatedTitle || '';
     let   content = draft.finalContent || draft.generatedContent || '';
 
-    // ── [IMAGE_N] 플레이스홀더 → 실제 <img> 태그로 교체 ──
+    // [IMAGE_N] 플레이스홀더 → 실제 <img> 태그로 교체
     const images = draft.images || [];
     images.forEach((img, idx) => {
       const imgUrl = img.publicUrl?.startsWith('http')
         ? img.publicUrl
         : `${API_BASE}${img.publicUrl}`;
-      const imgTag = `<figure><img src="${imgUrl}" alt="${img.originalName || ''}" style="max-width:100%;height:auto;display:block;margin:8px auto;"></figure>`;
+      const imgTag = `<p><img src="${imgUrl}" alt="${img.originalName || ''}" style="max-width:100%;height:auto;"></p>`;
       content = content.replace(`[IMAGE_${idx + 1}]`, imgTag);
     });
-    // 남은 플레이스홀더 제거
     content = content.replace(/\[IMAGE_\d+\]/g, '');
 
     const results = await chrome.scripting.executeScript({
@@ -104,29 +103,70 @@ insertBtn.addEventListener('click', async () => {
   }
 });
 
-// ── 페이지 컨텍스트에서 실행되는 함수 (MAIN world) ─────
-// 이 함수는 직렬화되어 탭에 주입됨 → 외부 변수 참조 불가
+// ── 페이지 컨텍스트에서 실행 (MAIN world) ─────────────────
 function insertDraftIntoEditor(title, content) {
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // 실제 contenteditable="true" 요소 찾기
+  function findEditable(selectors, doc) {
+    for (const sel of selectors) {
+      const els = (doc || document).querySelectorAll(sel);
+      for (const el of els) {
+        // 자기 자신이 contenteditable이고 크기가 있는 경우
+        if (el.isContentEditable && el.offsetHeight > 30) return el;
+      }
+    }
+    return null;
+  }
+
+  // 요소 내부만 선택 (document 전체 selectAll 사용 안 함)
+  function selectAllIn(el) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  // DataTransfer paste 시뮬레이션
+  function pasteHTML(el, html, doc) {
+    const dt = new DataTransfer();
+    dt.setData('text/html', html);
+    dt.setData('text/plain', html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+    const evt = new ClipboardEvent('paste', {
+      clipboardData: dt,
+      bubbles: true,
+      cancelable: true,
+    });
+    el.dispatchEvent(evt);
+  }
 
   async function run() {
     // ── 1. 제목 입력 ────────────────────────────────────
     const titleSelectors = [
-      '.se-title-input [contenteditable]',
+      '.se-title-input [contenteditable="true"]',
       '.se-title-input',
       '[data-placeholder="제목"]',
     ];
-    let titleEl = null;
-    for (const sel of titleSelectors) {
-      titleEl = document.querySelector(sel);
-      if (titleEl) break;
+    let titleEl = findEditable(titleSelectors, document);
+
+    // iframe 탐색
+    if (!titleEl) {
+      for (const iframe of document.querySelectorAll('iframe')) {
+        try {
+          const doc = iframe.contentDocument || iframe.contentWindow.document;
+          titleEl = findEditable(titleSelectors, doc);
+          if (titleEl) break;
+        } catch (e) {}
+      }
     }
+
     if (titleEl) {
-      titleEl.click();
       titleEl.focus();
-      await sleep(300);
-      document.execCommand('selectAll', false, null);
-      document.execCommand('delete', false, null);
+      await sleep(200);
+      selectAllIn(titleEl);
+      await sleep(100);
+      // 선택 후 insertText
       document.execCommand('insertText', false, title);
       titleEl.dispatchEvent(new Event('input', { bubbles: true }));
     }
@@ -135,83 +175,62 @@ function insertDraftIntoEditor(title, content) {
 
     // ── 2. 본문 에디터 찾기 ──────────────────────────────
     const contentSelectors = [
+      // SmartEditor ONE 본문 내 실제 contenteditable
+      '.se-component-content [contenteditable="true"]',
+      '.se-text [contenteditable="true"]',
+      '.se-content [contenteditable="true"]',
+      // fallback
       '.se-content',
-      '.se-main-container [contenteditable="true"]',
       '[role="textbox"]',
     ];
+
     let contentEl = null;
     let targetDoc = document;
 
-    // 메인 문서에서 먼저 탐색
-    for (const sel of contentSelectors) {
-      const els = document.querySelectorAll(sel);
-      for (const el of els) {
-        if (el.offsetHeight > 50) { contentEl = el; break; }
-      }
-      if (contentEl) break;
-    }
+    contentEl = findEditable(contentSelectors, document);
 
-    // iframe 내부 탐색
     if (!contentEl) {
       for (const iframe of document.querySelectorAll('iframe')) {
         try {
           const doc = iframe.contentDocument || iframe.contentWindow.document;
-          for (const sel of contentSelectors) {
-            const el = doc.querySelector(sel);
-            if (el && el.offsetHeight > 50) { contentEl = el; targetDoc = doc; break; }
-          }
-          if (contentEl) break;
+          contentEl = findEditable(contentSelectors, doc);
+          if (contentEl) { targetDoc = doc; break; }
         } catch (e) {}
       }
     }
 
     if (!contentEl) return { success: false, error: '에디터 본문 영역을 찾지 못했습니다.' };
 
+    // ── 3. 에디터 포커스 ────────────────────────────────
     contentEl.click();
     await sleep(400);
     contentEl.focus();
     await sleep(300);
 
-    // ── 3. DataTransfer paste 시뮬레이션 (가장 자연스러운 방식) ──
-    // 기존 내용 전체 선택
-    targetDoc.execCommand('selectAll', false, null);
+    // ── 4. 에디터 내부 전체 선택 (document 전체 아님) ──
+    selectAllIn(contentEl);
     await sleep(100);
 
-    // DataTransfer 객체로 paste 이벤트 생성
-    const dt = new DataTransfer();
-    dt.setData('text/html', content);
-    dt.setData('text/plain', content.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim());
-
-    const pasteEvent = new ClipboardEvent('paste', {
-      clipboardData: dt,
-      bubbles: true,
-      cancelable: true,
-    });
-
-    const handled = contentEl.dispatchEvent(pasteEvent);
-
+    // ── 5. paste 이벤트로 HTML 삽입 ────────────────────
+    pasteHTML(contentEl, content, targetDoc);
     await sleep(500);
 
-    // ── 4. paste 이벤트 미처리 시 execCommand fallback ──
-    // 에디터가 비어있으면 fallback 시도
-    const isEmpty = (contentEl.textContent || '').trim() === '' ||
-                    (contentEl.innerHTML || '').trim() === '' ||
-                    (contentEl.innerHTML || '').trim() === '<p><br></p>';
-
-    if (isEmpty) {
+    // ── 6. 삽입 확인 후 fallback ────────────────────────
+    const textLen = (contentEl.textContent || '').replace(/\s/g, '').length;
+    if (textLen < 5) {
       // execCommand insertHTML 시도
-      const inserted = targetDoc.execCommand('insertHTML', false, content);
+      selectAllIn(contentEl);
+      const ok = targetDoc.execCommand('insertHTML', false, content);
 
-      if (!inserted || isEmpty) {
-        // 최후 수단: innerHTML 직접 + 이벤트 발생
+      if (!ok || (contentEl.textContent || '').replace(/\s/g, '').length < 5) {
+        // 최후 수단: innerHTML 직접 교체
         contentEl.innerHTML = content;
-        ['input', 'change', 'keyup'].forEach(evtName => {
-          contentEl.dispatchEvent(new Event(evtName, { bubbles: true }));
-        });
+        ['input', 'change'].forEach(evtName =>
+          contentEl.dispatchEvent(new Event(evtName, { bubbles: true }))
+        );
       }
     }
 
-    await sleep(300);
     return { success: true };
   }
 
