@@ -19,7 +19,7 @@ public class WebConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         // 환경변수 CORS_ORIGINS 또는 기본값으로 허용
         String[] origins = corsOrigins.split(",");
-        registry.addMapping("/api/**")
+        registry.addMapping("/**")
                 .allowedOriginPatterns(
                         "http://localhost:*",
                         "https://*.vercel.app",
