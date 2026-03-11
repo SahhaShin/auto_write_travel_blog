@@ -1,8 +1,9 @@
-# CLAUDE.md — 네이버 블로그 자동 포스팅 프로젝트
+# CLAUDE.md — 네이버 블로그 AI 초안 생성 프로젝트
 
 ## 프로젝트 개요
 
-기존 네이버 블로그 글의 문체를 AI가 학습하여, 이미지와 여행 계획 입력만으로 동일 스타일의 블로그 초안을 자동 생성하고 네이버에 자동 발행하는 풀스택 웹앱.
+기존 네이버 블로그 글의 문체를 AI가 학습하여, 이미지와 여행 계획 입력만으로 동일 스타일의 블로그 초안을 자동 생성하는 풀스택 웹앱.
+생성된 초안은 크롬 익스텐션으로 네이버 블로그 글쓰기 페이지에 삽입, 제목은 사용자가 직접 입력 후 발행.
 
 ---
 
@@ -14,9 +15,9 @@
 | Backend | Spring Boot 3.2 (Java 17) + MyBatis |
 | Database | TiDB Cloud Serverless (MySQL 8 호환) |
 | AI | Claude API (`claude-sonnet-4-6`) + Gemini 2.5-flash (fallback) |
-| 자동화 | Selenium 4 + WebDriverManager |
+| 이미지 저장 | Cloudinary (Render ephemeral fs 대체) |
 | 에디터 | TipTap (ProseMirror 기반) |
-| 암호화 | AES-256 (Jasypt) |
+| 크롬 익스텐션 | Manifest V3, MAIN world scripting |
 | 배포 | Frontend → Vercel / Backend → Render (Docker) |
 
 ---
@@ -27,29 +28,27 @@
 auto-blog/
 ├── Dockerfile                  # 루트 Dockerfile (Render 배포용, build context = repo root)
 ├── render.yaml                 # Render 배포 설정
-├── CLAUDE.md                   # 이 파일
-├── history.md                  # 개발 히스토리
-├── README.md                   # 프로젝트 문서
+├── chrome-extension/           # 크롬 익스텐션
+│   ├── manifest.json
+│   ├── popup.html / popup.js   # 초안 선택 + 본문 삽입 (MAIN world)
+│   └── content.js
 ├── backend/
-│   ├── Dockerfile              # 로컬 Docker 빌드용 (rootDir=backend 기준)
 │   ├── pom.xml
 │   └── src/main/
 │       ├── java/com/shincha/naverblog/
 │       │   ├── controller/     # REST 컨트롤러 5개
 │       │   ├── model/dto/      # DTO 클래스
 │       │   ├── model/dao/      # MyBatis DAO 인터페이스
-│       │   ├── model/service/  # 서비스 구현체
-│       │   └── util/EncryptionUtil.java
+│       │   └── model/service/  # 서비스 구현체
 │       └── resources/
 │           ├── application.properties
 │           ├── application-local.properties  # gitignore, 로컬 전용
 │           ├── schema.sql
-│           └── mappers/        # MyBatis XML 매퍼 5개
+│           └── mappers/        # MyBatis XML 매퍼 4개
 └── frontend/
     ├── src/
-    │   ├── api/                # axiosClient + 5개 API 모듈
-    │   └── pages/              # 5개 페이지 컴포넌트
-    ├── .env                    # 로컬 전용 (gitignore)
+    │   ├── api/                # axiosClient + 4개 API 모듈
+    │   └── pages/              # 4개 페이지 컴포넌트
     ├── vercel.json
     └── package.json
 ```
@@ -113,17 +112,19 @@ vercel --prod --yes
 | `DB_USERNAME` | TiDB 사용자명 |
 | `DB_PASSWORD` | TiDB 비밀번호 |
 | `CLAUDE_API_KEY` | Anthropic API 키 |
-| `GEMINI_API_KEY` | Google AI Studio 키 (무료) |
-| `AES_SECRET_KEY` | 32자 이상 임의 문자열 |
+| `GEMINI_API_KEY` | Google AI Studio 키 (무료, fallback용) |
 | `CORS_ORIGINS` | `https://frontend-blush-seven-53.vercel.app` |
 | `UPLOAD_DIR` | `/app/uploads` |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary 클라우드명 |
+| `CLOUDINARY_API_KEY` | Cloudinary API 키 |
+| `CLOUDINARY_API_SECRET` | Cloudinary API 시크릿 |
 
 ### Database → TiDB Cloud
 
 - 클러스터: ap-southeast-1 (Singapore), Serverless Free
 - DB명: `naver_blog_auto`
-- 테이블: `blog_style_samples`, `blog_drafts`, `blog_images`, `post_history`, `naver_credentials`
-- 스키마 변경 시 TiDB 콘솔 SQL Editor에서 수동 실행 필요 (`spring.sql.init.mode` 미설정)
+- 테이블: `blog_style_samples`, `blog_drafts`, `blog_images`, `post_history`
+- 스키마 변경 시 TiDB 콘솔 SQL Editor에서 수동 실행 필요
 
 ---
 
@@ -142,6 +143,6 @@ vercel --prod --yes
 - **Java**: 로컬 기본 Java가 11이므로 빌드/실행 시 `JAVA_HOME` 명시 필수
 - **Render 슬립**: 무료 플랜 15분 비활성 → 첫 요청 50초+ 지연
 - **schema.sql 자동 실행 안됨**: DB 스키마 변경 시 TiDB 콘솔에서 직접 실행
-- **render.yaml vs 대시보드**: 기존 서비스는 대시보드 설정이 우선 — 변경 후 대시보드에서 확인
-- **Selenium + Chrome**: Render 무료 512MB 환경에서 불안정 가능
-- **네이버 SmartEditor**: CSS 선택자가 네이버 업데이트 시 변경될 수 있음
+- **render.yaml vs 대시보드**: 기존 서비스는 대시보드 설정이 우선
+- **Cloudinary**: 이미지 영구 저장. 미설정 시 로컬 uploads 폴더에 저장 (Render에서는 재배포 시 삭제됨)
+- **크롬 익스텐션**: 제목은 SmartEditor ONE API 접근 불가로 사용자가 직접 입력. 본문만 자동 삽입

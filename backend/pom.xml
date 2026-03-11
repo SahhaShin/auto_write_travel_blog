@@ -49,27 +49,6 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Jasypt (AES 암호화 - 네이버 자격증명 보호) -->
-        <dependency>
-            <groupId>com.github.ulisesbocchio</groupId>
-            <artifactId>jasypt-spring-boot-starter</artifactId>
-            <version>3.0.5</version>
-        </dependency>
-
-        <!-- Selenium (네이버 자동 포스팅) -->
-        <dependency>
-            <groupId>org.seleniumhq.selenium</groupId>
-            <artifactId>selenium-java</artifactId>
-            <version>4.18.1</version>
-        </dependency>
-
-        <!-- WebDriverManager (ChromeDriver 자동 관리) -->
-        <dependency>
-            <groupId>io.github.bonigarcia</groupId>
-            <artifactId>webdrivermanager</artifactId>
-            <version>5.8.0</version>
-        </dependency>
-
         <!-- Jsoup (네이버 블로그 URL 스크래핑) -->
         <dependency>
             <groupId>org.jsoup</groupId>

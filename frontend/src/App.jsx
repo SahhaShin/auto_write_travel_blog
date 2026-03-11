@@ -3,7 +3,6 @@ import StyleReferencePage from './pages/StyleReferencePage';
 import CreatePostPage from './pages/CreatePostPage';
 import EditorPage from './pages/EditorPage';
 import HistoryPage from './pages/HistoryPage';
-import SettingsPage from './pages/SettingsPage';
 import './App.css';
 
 function App() {
@@ -19,7 +18,6 @@ function App() {
             <NavLink to="/create">새 글 작성</NavLink>
             <NavLink to="/styles">스타일 관리</NavLink>
             <NavLink to="/history">발행 히스토리</NavLink>
-            <NavLink to="/settings">설정</NavLink>
           </nav>
         </header>
         <main className="app-main">
@@ -29,7 +27,6 @@ function App() {
             <Route path="/editor/:draftId" element={<EditorPage />} />
             <Route path="/styles" element={<StyleReferencePage />} />
             <Route path="/history" element={<HistoryPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>
       </div>

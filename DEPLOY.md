@@ -31,7 +31,6 @@
 spring.datasource.password=MySQL_비밀번호
 claude.api.key=sk-ant-api03-...
 gemini.api.key=AIzaSy...
-jasypt.encryptor.password=아무_32자_이상_문자열
 ```
 
 ### 백엔드 실행
@@ -115,10 +114,12 @@ git push origin main
 | `DB_USERNAME` | TiDB 사용자명 |
 | `DB_PASSWORD` | TiDB 비밀번호 |
 | `CLAUDE_API_KEY` | Anthropic API 키 |
-| `GEMINI_API_KEY` | Google AI Studio 키 (무료) |
-| `AES_SECRET_KEY` | 32자 이상 임의 문자열 |
+| `GEMINI_API_KEY` | Google AI Studio 키 (무료, fallback) |
 | `CORS_ORIGINS` | `https://frontend-blush-seven-53.vercel.app` |
 | `UPLOAD_DIR` | `/app/uploads` |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary 클라우드명 |
+| `CLOUDINARY_API_KEY` | Cloudinary API 키 |
+| `CLOUDINARY_API_SECRET` | Cloudinary API 시크릿 |
 
 **Render 설정 (대시보드 확인):**
 - Root Directory: 비워두기
@@ -136,16 +137,24 @@ git push origin main
 backend/src/main/resources/schema.sql 참고
 ```
 
+### 크롬 익스텐션
+
+별도 빌드 불필요. `chrome-extension/` 폴더를 그대로 로드.
+
+```
+1. chrome://extensions → 개발자 모드 ON
+2. "압축해제된 확장 프로그램 로드" → chrome-extension/ 폴더 선택
+3. 코드 변경 후에는 chrome://extensions에서 새로고침(↺) 필요
+```
+
 ---
 
 ## Dockerfile 구조
 
 ```
 repo root/
-├── Dockerfile          ← Render 배포용 (build context = repo root)
-│                         COPY backend/pom.xml, COPY backend/src
-└── backend/
-    └── Dockerfile      ← 로컬/참고용 (build context = backend/)
+└── Dockerfile    ← Render 배포용 (build context = repo root)
+                    COPY backend/pom.xml, COPY backend/src
 ```
 
 ---
@@ -153,6 +162,6 @@ repo root/
 ## 주의사항
 
 - **Render 무료 플랜**: 15분 비활성 시 슬립 → 첫 요청 50초+ 지연
-- **render.yaml vs 대시보드**: 기존 서비스는 대시보드 설정 우선 — 변경 후 대시보드에서 반드시 확인
-- **schema.sql 자동 실행 안됨**: `spring.sql.init.mode` 미설정 상태. DB 스키마 변경 시 TiDB 콘솔에서 수동 실행
-- **Selenium + Chrome**: Render 무료 512MB 환경에서 불안정 가능
+- **render.yaml vs 대시보드**: 기존 서비스는 대시보드 설정 우선
+- **schema.sql 자동 실행 안됨**: DB 스키마 변경 시 TiDB 콘솔에서 수동 실행
+- **Cloudinary 미설정 시**: 이미지가 로컬 uploads에 저장 → Render 재배포 시 삭제됨

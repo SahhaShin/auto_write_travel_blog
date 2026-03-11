@@ -7,22 +7,10 @@ import TextAlign from '@tiptap/extension-text-align';
 import Placeholder from '@tiptap/extension-placeholder';
 import { draftApi } from '../api/draftApi';
 import { generateApi } from '../api/generateApi';
-import { postApi } from '../api/postApi';
 import './EditorPage.css';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 const getImageUrl = (publicUrl) => publicUrl?.startsWith('http') ? publicUrl : `${BASE_URL}${publicUrl}`;
-
-const STATUS_MESSAGES = {
-  PENDING: '발행 준비 중...',
-  LOGGING_IN: '네이버에 로그인 중...',
-  NAVIGATING: '블로그 페이지 이동 중...',
-  SETTING_TITLE: '제목 입력 중...',
-  SETTING_CONTENT: '본문 입력 중...',
-  UPLOADING_IMAGES: '이미지 업로드 중...',
-  PUBLISHING: '발행 중...',
-  UNKNOWN: '상태 확인 중...',
-};
 
 export default function EditorPage() {
   const { draftId } = useParams();
@@ -30,14 +18,10 @@ export default function EditorPage() {
   const [draft, setDraft] = useState(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [posting, setPosting] = useState(false);
-  const [postStatus, setPostStatus] = useState('');
-  const [postUrl, setPostUrl] = useState('');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(true);
   const [title, setTitle] = useState('');
   const saveTimer = useRef(null);
-  const pollTimer = useRef(null);
 
   const editor = useEditor({
     extensions: [
@@ -71,7 +55,6 @@ export default function EditorPage() {
     loadDraft();
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      if (pollTimer.current) clearInterval(pollTimer.current);
     };
   }, [draftId]);
 
@@ -89,7 +72,6 @@ export default function EditorPage() {
       setTitle(data.finalTitle || data.generatedTitle || '');
       if (editor && (data.finalContent || data.generatedContent)) {
         let content = data.finalContent || data.generatedContent;
-        // 이미지 플레이스홀더를 실제 img 태그로 변환
         if (data.images) {
           data.images.forEach((img, i) => {
             content = content.replace(
@@ -126,16 +108,10 @@ export default function EditorPage() {
     setGenerating(true);
     setError('');
     try {
-      const result = await generateApi.generate(draftId, []);
-      setDraft(result);
-      setTitle(result.generatedTitle || '');
-
-      let content = result.generatedContent || '';
-      if (result.images) {
-        // 이미지 목록은 draft에서 가져옴
-      }
-      // 이미지 데이터를 가져와서 플레이스홀더 교체
+      await generateApi.generate(draftId, []);
       const freshDraft = await draftApi.getById(draftId);
+      setDraft(freshDraft);
+      setTitle(freshDraft.generatedTitle || '');
       let freshContent = freshDraft.generatedContent || '';
       if (freshDraft.images) {
         freshDraft.images.forEach((img, i) => {
@@ -154,49 +130,6 @@ export default function EditorPage() {
     }
   };
 
-  const handlePost = async () => {
-    if (!window.confirm('네이버 블로그에 발행하시겠습니까?')) return;
-
-    // 먼저 저장
-    await autoSave();
-
-    setPosting(true);
-    setPostStatus('PENDING');
-    setPostUrl('');
-    setError('');
-
-    try {
-      await postApi.startPost(draftId);
-
-      // 상태 폴링
-      pollTimer.current = setInterval(async () => {
-        try {
-          const result = await postApi.getStatus(draftId);
-          const status = result.status;
-
-          if (status.startsWith('SUCCESS:')) {
-            clearInterval(pollTimer.current);
-            setPostUrl(status.replace('SUCCESS:', ''));
-            setPostStatus('SUCCESS');
-            setPosting(false);
-          } else if (status.startsWith('FAILED:')) {
-            clearInterval(pollTimer.current);
-            setError('발행 실패: ' + status.replace('FAILED:', ''));
-            setPostStatus('FAILED');
-            setPosting(false);
-          } else {
-            setPostStatus(status);
-          }
-        } catch (e) {
-          console.error('상태 조회 실패', e);
-        }
-      }, 3000);
-    } catch (e) {
-      setError('발행 시작 실패: ' + e.message);
-      setPosting(false);
-    }
-  };
-
   if (loading) {
     return <div style={{ textAlign: 'center', padding: 60 }}><span className="spinner" /></div>;
   }
@@ -212,42 +145,21 @@ export default function EditorPage() {
           </span>
         </div>
         <div className="editor-topbar-right">
-          {!generating && (
-            <button className="btn btn-secondary" onClick={handleGenerate}>
-              AI 재생성
-            </button>
-          )}
           <button
-            className="btn btn-primary"
-            onClick={handlePost}
-            disabled={posting || generating}
-            style={{ background: '#03c75a' }}
+            className="btn btn-secondary"
+            onClick={handleGenerate}
+            disabled={generating}
           >
-            {posting ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="spinner" />
-                {STATUS_MESSAGES[postStatus] || '발행 중...'}
-              </span>
-            ) : '네이버에 발행'}
+            {generating ? <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span className="spinner" />생성 중...</span> : 'AI 재생성'}
           </button>
         </div>
       </div>
 
-      {/* AI 생성 중 오버레이 */}
+      {/* AI 생성 중 배너 */}
       {generating && (
         <div className="generating-banner">
           <span className="spinner" />
           <span>AI가 여행 블로그를 작성 중입니다... (10-30초 소요)</span>
-        </div>
-      )}
-
-      {/* 발행 성공 배너 */}
-      {postUrl && (
-        <div className="success-banner">
-          <span>발행 완료!</span>
-          <a href={postUrl} target="_blank" rel="noreferrer" style={{ color: 'white', fontWeight: 700 }}>
-            네이버 블로그에서 보기 →
-          </a>
         </div>
       )}
 
@@ -257,7 +169,6 @@ export default function EditorPage() {
 
       {/* 편집 영역 */}
       <div className="editor-container">
-        {/* 제목 */}
         <input
           className="title-input"
           type="text"
@@ -266,7 +177,6 @@ export default function EditorPage() {
           onChange={e => setTitle(e.target.value)}
         />
 
-        {/* 여행 정보 요약 */}
         {draft && (
           <div className="draft-meta">
             <span>📍 {draft.destination}</span>
@@ -275,7 +185,6 @@ export default function EditorPage() {
           </div>
         )}
 
-        {/* TipTap 에디터 툴바 */}
         {editor && (
           <div className="editor-toolbar">
             <button
@@ -301,10 +210,21 @@ export default function EditorPage() {
           </div>
         )}
 
-        {/* 에디터 본문 */}
         <div className="editor-content-wrapper">
           <EditorContent editor={editor} />
         </div>
+      </div>
+
+      {/* 크롬 익스텐션 안내 */}
+      <div className="card" style={{ marginTop: 16, background: '#f0f7ff', border: '1px solid #c5d8f7' }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#1a56db' }}>📌 네이버 블로그 발행 방법</h3>
+        <ol style={{ paddingLeft: 18, lineHeight: 2, fontSize: 13, color: '#374151' }}>
+          <li>초안 상태를 <strong>READY</strong>로 변경 후 저장</li>
+          <li>네이버 블로그 글쓰기 페이지로 이동</li>
+          <li>크롬 익스텐션 <strong>"네이버 블로그 초안 불러오기"</strong> 클릭</li>
+          <li>초안 선택 → <strong>초안 불러오기</strong> → 본문 자동 입력</li>
+          <li>제목 직접 입력 후 발행</li>
+        </ol>
       </div>
 
       {/* 이미지 목록 */}
