@@ -4,6 +4,7 @@ import CreatePostPage from './pages/CreatePostPage';
 import EditorPage from './pages/EditorPage';
 import HistoryPage from './pages/HistoryPage';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import './App.css';
 
 function RequireAuth({ children }) {
@@ -59,6 +60,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route path="/*" element={
           <RequireAuth>
             <Layout />

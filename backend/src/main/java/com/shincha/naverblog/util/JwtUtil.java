@@ -23,23 +23,27 @@ public class JwtUtil {
         this.expirationMs = expirationMs;
     }
 
-    public String generate(String username) {
+    public String generate(Long userId, String username) {
         return Jwts.builder()
-                .subject(username)
+                .subject(String.valueOf(userId))
+                .claim("username", username)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(key)
                 .compact();
     }
 
+    public Long extractUserId(String token) {
+        return Long.parseLong(claims(token).getSubject());
+    }
+
     public String extractUsername(String token) {
-        return claims(token).getSubject();
+        return (String) claims(token).get("username");
     }
 
     public boolean isValid(String token) {
         try {
-            Claims c = claims(token);
-            return c.getExpiration().after(new Date());
+            return claims(token).getExpiration().after(new Date());
         } catch (Exception e) {
             return false;
         }

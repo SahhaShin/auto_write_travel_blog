@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 @Data
 public class BlogStyleSample {
     private Long id;
+    private Long userId;
     private String title;
     private String sourceUrl;
     private String content;

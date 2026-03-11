@@ -1,9 +1,11 @@
 package com.shincha.naverblog.controller;
 
+import com.shincha.naverblog.model.dao.UserDao;
+import com.shincha.naverblog.model.dto.User;
 import com.shincha.naverblog.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -14,31 +16,41 @@ import java.util.Map;
 public class AuthController {
 
     private final JwtUtil jwtUtil;
+    private final UserDao userDao;
+    private final BCryptPasswordEncoder passwordEncoder;
 
-    @Value("${admin.username}")
-    private String adminUsername;
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody Map<String, String> body) {
+        String username = body.get("username");
+        String password = body.get("password");
 
-    @Value("${admin.password}")
-    private String adminPassword;
+        if (username == null || username.isBlank() || password == null || password.length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("error", "아이디와 비밀번호(6자 이상)를 입력해주세요."));
+        }
+        if (userDao.findByUsername(username) != null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "이미 사용 중인 아이디입니다."));
+        }
+
+        User user = new User();
+        user.setUsername(username);
+        user.setPasswordHash(passwordEncoder.encode(password));
+        userDao.insert(user);
+
+        String token = jwtUtil.generate(user.getId(), username);
+        return ResponseEntity.ok(Map.of("token", token, "username", username));
+    }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
         String username = body.get("username");
         String password = body.get("password");
 
-        if (adminUsername.equals(username) && adminPassword.equals(password)) {
-            String token = jwtUtil.generate(username);
-            return ResponseEntity.ok(Map.of("token", token, "username", username));
+        User user = userDao.findByUsername(username);
+        if (user == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
+            return ResponseEntity.status(401).body(Map.of("error", "아이디 또는 비밀번호가 올바르지 않습니다."));
         }
-        return ResponseEntity.status(401).body(Map.of("error", "아이디 또는 비밀번호가 올바르지 않습니다."));
-    }
 
-    @GetMapping("/me")
-    public ResponseEntity<?> me(@RequestHeader("Authorization") String authHeader) {
-        String token = authHeader.replace("Bearer ", "");
-        if (jwtUtil.isValid(token)) {
-            return ResponseEntity.ok(Map.of("username", jwtUtil.extractUsername(token)));
-        }
-        return ResponseEntity.status(401).body(Map.of("error", "유효하지 않은 토큰입니다."));
+        String token = jwtUtil.generate(user.getId(), username);
+        return ResponseEntity.ok(Map.of("token", token, "username", username));
     }
 }

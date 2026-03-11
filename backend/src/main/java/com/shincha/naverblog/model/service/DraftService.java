@@ -4,7 +4,7 @@ import com.shincha.naverblog.model.dto.BlogDraft;
 import java.util.List;
 
 public interface DraftService {
-    List<BlogDraft> getAll();
+    List<BlogDraft> getAll(Long userId);
     BlogDraft getById(Long id);
     BlogDraft create(BlogDraft draft);
     BlogDraft update(BlogDraft draft);

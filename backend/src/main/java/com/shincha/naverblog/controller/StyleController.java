@@ -4,6 +4,7 @@ import com.shincha.naverblog.model.dto.BlogStyleSample;
 import com.shincha.naverblog.model.service.StyleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,7 +19,8 @@ public class StyleController {
 
     @GetMapping
     public ResponseEntity<List<BlogStyleSample>> getAll() {
-        return ResponseEntity.ok(styleService.getAll());
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return ResponseEntity.ok(styleService.getAll(userId));
     }
 
     @GetMapping("/{id}")
@@ -30,18 +32,21 @@ public class StyleController {
 
     @PostMapping
     public ResponseEntity<BlogStyleSample> addFromText(@RequestBody BlogStyleSample sample) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        sample.setUserId(userId);
         return ResponseEntity.ok(styleService.addFromText(sample));
     }
 
     @PostMapping("/from-url")
     public ResponseEntity<?> addFromUrl(@RequestBody Map<String, String> body) {
         try {
+            Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
             String url = body.get("url");
             String category = body.get("category");
             if (url == null || url.isBlank()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "URL이 필요합니다."));
             }
-            BlogStyleSample saved = styleService.addFromUrl(url, category);
+            BlogStyleSample saved = styleService.addFromUrl(url, category, userId);
             return ResponseEntity.ok(saved);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

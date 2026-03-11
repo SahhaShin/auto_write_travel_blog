@@ -4,6 +4,7 @@ import com.shincha.naverblog.model.dto.BlogDraft;
 import com.shincha.naverblog.model.service.ClaudeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,6 +22,7 @@ public class GenerateController {
             @PathVariable Long draftId,
             @RequestBody(required = false) Map<String, Object> body) {
         try {
+            Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
             List<Long> styleSampleIds = null;
             if (body != null && body.containsKey("styleSampleIds")) {
                 List<?> rawList = (List<?>) body.get("styleSampleIds");
@@ -28,7 +30,7 @@ public class GenerateController {
                         .map(v -> Long.parseLong(v.toString()))
                         .toList();
             }
-            BlogDraft result = claudeService.generateContent(draftId, styleSampleIds);
+            BlogDraft result = claudeService.generateContent(draftId, styleSampleIds, userId);
             return ResponseEntity.ok(result);
         } catch (RuntimeException e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
@@ -40,6 +42,7 @@ public class GenerateController {
             @PathVariable Long draftId,
             @RequestBody Map<String, Object> body) {
         try {
+            Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
             List<Long> styleSampleIds = null;
             if (body.containsKey("styleSampleIds")) {
                 List<?> rawList = (List<?>) body.get("styleSampleIds");
@@ -48,7 +51,7 @@ public class GenerateController {
                         .toList();
             }
             String customInstructions = (String) body.get("customInstructions");
-            BlogDraft result = claudeService.regenerateContent(draftId, styleSampleIds, customInstructions);
+            BlogDraft result = claudeService.regenerateContent(draftId, styleSampleIds, customInstructions, userId);
             return ResponseEntity.ok(result);
         } catch (RuntimeException e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));

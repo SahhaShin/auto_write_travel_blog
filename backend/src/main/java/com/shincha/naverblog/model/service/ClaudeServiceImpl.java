@@ -51,16 +51,16 @@ public class ClaudeServiceImpl implements ClaudeService {
             .build();
 
     @Override
-    public BlogDraft generateContent(Long draftId, List<Long> styleSampleIds) {
-        return generate(draftId, styleSampleIds, null);
+    public BlogDraft generateContent(Long draftId, List<Long> styleSampleIds, Long userId) {
+        return generate(draftId, styleSampleIds, null, userId);
     }
 
     @Override
-    public BlogDraft regenerateContent(Long draftId, List<Long> styleSampleIds, String customInstructions) {
-        return generate(draftId, styleSampleIds, customInstructions);
+    public BlogDraft regenerateContent(Long draftId, List<Long> styleSampleIds, String customInstructions, Long userId) {
+        return generate(draftId, styleSampleIds, customInstructions, userId);
     }
 
-    private BlogDraft generate(Long draftId, List<Long> styleSampleIds, String customInstructions) {
+    private BlogDraft generate(Long draftId, List<Long> styleSampleIds, String customInstructions, Long userId) {
         BlogDraft draft = draftDao.findById(draftId);
         if (draft == null) {
             throw new RuntimeException("Draft를 찾을 수 없습니다: " + draftId);
@@ -69,7 +69,7 @@ public class ClaudeServiceImpl implements ClaudeService {
         List<BlogImage> images = imageDao.findByDraftId(draftId);
         List<BlogStyleSample> styleSamples = styleSampleIds != null && !styleSampleIds.isEmpty()
                 ? styleSampleIds.stream().map(styleDao::findById).collect(Collectors.toList())
-                : styleDao.findAll().stream().limit(3).collect(Collectors.toList());
+                : styleDao.findAllByUserId(userId).stream().limit(3).collect(Collectors.toList());
 
         String systemPrompt = buildSystemPrompt(styleSamples);
         String userPrompt = buildUserPrompt(draft, images, customInstructions);

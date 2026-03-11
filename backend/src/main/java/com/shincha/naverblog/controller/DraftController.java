@@ -4,6 +4,7 @@ import com.shincha.naverblog.model.dto.BlogDraft;
 import com.shincha.naverblog.model.service.DraftService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,7 +18,8 @@ public class DraftController {
 
     @GetMapping
     public ResponseEntity<List<BlogDraft>> getAll() {
-        return ResponseEntity.ok(draftService.getAll());
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return ResponseEntity.ok(draftService.getAll(userId));
     }
 
     @GetMapping("/{id}")
@@ -29,6 +31,8 @@ public class DraftController {
 
     @PostMapping
     public ResponseEntity<BlogDraft> create(@RequestBody BlogDraft draft) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        draft.setUserId(userId);
         BlogDraft created = draftService.create(draft);
         return ResponseEntity.ok(created);
     }

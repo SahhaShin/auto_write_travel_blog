@@ -2,18 +2,25 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 
-export default function LoginPage() {
-  const [form, setForm] = useState({ username: '', password: '' });
+export default function RegisterPage() {
+  const [form, setForm] = useState({ username: '', password: '', passwordConfirm: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (form.password !== form.passwordConfirm) {
+      setError('비밀번호가 일치하지 않습니다.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      const { data } = await axiosClient.post('/api/auth/login', form);
+      const { data } = await axiosClient.post('/api/auth/register', {
+        username: form.username,
+        password: form.password,
+      });
       localStorage.setItem('token', data.token);
       navigate('/');
     } catch (e) {
@@ -39,7 +46,7 @@ export default function LoginPage() {
             fontSize: 24, color: 'white', fontWeight: 700, marginBottom: 12,
           }}>N</div>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: '#111' }}>블로그 자동 포스터</h1>
-          <p style={{ fontSize: 13, color: '#888', marginTop: 4 }}>로그인이 필요합니다</p>
+          <p style={{ fontSize: 13, color: '#888', marginTop: 4 }}>회원가입</p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -55,12 +62,23 @@ export default function LoginPage() {
             />
           </div>
           <div className="form-group">
-            <label>비밀번호</label>
+            <label>비밀번호 (6자 이상)</label>
             <input
               type="password"
               placeholder="비밀번호"
               value={form.password}
               onChange={e => setForm({ ...form, password: e.target.value })}
+              required
+              minLength={6}
+            />
+          </div>
+          <div className="form-group">
+            <label>비밀번호 확인</label>
+            <input
+              type="password"
+              placeholder="비밀번호 확인"
+              value={form.passwordConfirm}
+              onChange={e => setForm({ ...form, passwordConfirm: e.target.value })}
               required
             />
           </div>
@@ -75,14 +93,14 @@ export default function LoginPage() {
             style={{ width: '100%', padding: '12px', fontSize: 15 }}
             disabled={loading}
           >
-            {loading ? <span className="spinner" /> : '로그인'}
+            {loading ? <span className="spinner" /> : '회원가입'}
           </button>
         </form>
 
         <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: '#888' }}>
-          계정이 없으신가요?{' '}
-          <Link to="/register" style={{ color: '#03c75a', textDecoration: 'none', fontWeight: 600 }}>
-            회원가입
+          이미 계정이 있으신가요?{' '}
+          <Link to="/login" style={{ color: '#03c75a', textDecoration: 'none', fontWeight: 600 }}>
+            로그인
           </Link>
         </p>
       </div>

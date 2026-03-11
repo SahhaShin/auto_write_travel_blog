@@ -13,13 +13,13 @@
         <result property="styleTags" column="style_tags"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
+        <result property="userId" column="user_id"/>
         <result property="isActive" column="is_active"/>
     </resultMap>
 
-    <select id="findAll" resultMap="StyleResultMap">
+    <select id="findAllByUserId" resultMap="StyleResultMap">
         SELECT * FROM blog_style_samples
-        WHERE is_active = 1
-        ORDER BY created_at DESC
+        WHERE is_active = 1 AND user_id = #{userId} ORDER BY created_at DESC
     </select>
 
     <select id="findById" parameterType="long" resultMap="StyleResultMap">
@@ -33,8 +33,8 @@
     </select>
 
     <insert id="insert" parameterType="BlogStyleSample" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO blog_style_samples (title, source_url, content, category, style_tags)
-        VALUES (#{title}, #{sourceUrl}, #{content}, #{category}, #{styleTags})
+        INSERT INTO blog_style_samples (user_id, title, source_url, content, category, style_tags)
+        VALUES (#{userId}, #{title}, #{sourceUrl}, #{content}, #{category}, #{styleTags})
     </insert>
 
     <update id="softDelete" parameterType="long">

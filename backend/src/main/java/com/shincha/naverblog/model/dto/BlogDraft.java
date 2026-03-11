@@ -7,6 +7,7 @@ import java.util.List;
 @Data
 public class BlogDraft {
     private Long id;
+    private Long userId;
 
     // 여행 입력 정보
     private String destination;

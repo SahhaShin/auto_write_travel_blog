@@ -20,8 +20,8 @@ public class StyleServiceImpl implements StyleService {
     private final StyleDao styleDao;
 
     @Override
-    public List<BlogStyleSample> getAll() {
-        return styleDao.findAll();
+    public List<BlogStyleSample> getAll(Long userId) {
+        return styleDao.findAllByUserId(userId);
     }
 
     @Override
@@ -36,9 +36,8 @@ public class StyleServiceImpl implements StyleService {
     }
 
     @Override
-    public BlogStyleSample addFromUrl(String url, String category) {
+    public BlogStyleSample addFromUrl(String url, String category, Long userId) {
         try {
-            // 네이버 블로그는 iframe 구조 → 모바일 URL로 변환하면 본문 직접 접근 가능
             String fetchUrl = toMobileNaverUrl(url);
             log.info("스크래핑 URL: {}", fetchUrl);
 
@@ -48,7 +47,6 @@ public class StyleServiceImpl implements StyleService {
                     .timeout(10000)
                     .get();
 
-            // 네이버 블로그 본문 추출 (SmartEditor 컨텐츠 영역)
             String title = doc.title();
             String content = extractNaverBlogContent(doc);
 
@@ -61,6 +59,7 @@ public class StyleServiceImpl implements StyleService {
             sample.setSourceUrl(url);
             sample.setContent(content);
             sample.setCategory(category != null ? category : "여행");
+            sample.setUserId(userId);
             sample.setActive(true);
 
             styleDao.insert(sample);
@@ -72,10 +71,6 @@ public class StyleServiceImpl implements StyleService {
         }
     }
 
-    /**
-     * 네이버 블로그 PC URL을 모바일 URL로 변환
-     * https://blog.naver.com/id/postNo → https://m.blog.naver.com/id/postNo
-     */
     private String toMobileNaverUrl(String url) {
         if (url.contains("blog.naver.com") && !url.contains("m.blog.naver.com")) {
             return url.replace("blog.naver.com", "m.blog.naver.com");
@@ -84,16 +79,10 @@ public class StyleServiceImpl implements StyleService {
     }
 
     private String extractNaverBlogContent(Document doc) {
-        // 네이버 모바일 블로그 SmartEditor ONE 본문 영역 시도
         String[] selectors = {
-                ".se-main-container",
-                "#postViewArea",
-                ".post_ct",
-                ".se_doc_viewer",
-                "div.se-component",
-                "article"
+                ".se-main-container", "#postViewArea", ".post_ct",
+                ".se_doc_viewer", "div.se-component", "article"
         };
-
         for (String selector : selectors) {
             Element element = doc.selectFirst(selector);
             if (element != null) {
@@ -104,8 +93,6 @@ public class StyleServiceImpl implements StyleService {
                 }
             }
         }
-
-        // 최후 수단: body 전체 텍스트
         String bodyText = doc.body().text().trim();
         log.warn("셀렉터 매칭 실패, body 전체 텍스트 사용, 글자수: {}", bodyText.length());
         return bodyText;
