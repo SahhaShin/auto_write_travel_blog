@@ -69,9 +69,20 @@ insertBtn.addEventListener('click', async () => {
     }
 
     const title   = draft.finalTitle || draft.generatedTitle || '';
-    const content = draft.finalContent || draft.generatedContent || '';
+    let   content = draft.finalContent || draft.generatedContent || '';
 
-    // 페이지 컨텍스트(MAIN world)에서 직접 실행 → SmartEditor API 접근 가능
+    // ── [IMAGE_N] 플레이스홀더 → 실제 <img> 태그로 교체 ──
+    const images = draft.images || [];
+    images.forEach((img, idx) => {
+      const imgUrl = img.publicUrl?.startsWith('http')
+        ? img.publicUrl
+        : `${API_BASE}${img.publicUrl}`;
+      const imgTag = `<figure><img src="${imgUrl}" alt="${img.originalName || ''}" style="max-width:100%;height:auto;display:block;margin:8px auto;"></figure>`;
+      content = content.replace(`[IMAGE_${idx + 1}]`, imgTag);
+    });
+    // 남은 플레이스홀더 제거
+    content = content.replace(/\[IMAGE_\d+\]/g, '');
+
     const results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       world: 'MAIN',
@@ -99,12 +110,11 @@ function insertDraftIntoEditor(title, content) {
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   async function run() {
-    // ── 제목 입력 ──────────────────────────────────────
+    // ── 1. 제목 입력 ────────────────────────────────────
     const titleSelectors = [
       '.se-title-input [contenteditable]',
       '.se-title-input',
       '[data-placeholder="제목"]',
-      'div[contenteditable="true"]:first-of-type',
     ];
     let titleEl = null;
     for (const sel of titleSelectors) {
@@ -115,42 +125,40 @@ function insertDraftIntoEditor(title, content) {
       titleEl.click();
       titleEl.focus();
       await sleep(300);
-      // 전체 선택 후 삭제 후 입력
-      const range = document.createRange();
-      range.selectNodeContents(titleEl);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      document.execCommand('delete');
+      document.execCommand('selectAll', false, null);
+      document.execCommand('delete', false, null);
       document.execCommand('insertText', false, title);
+      titleEl.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
-    await sleep(500);
+    await sleep(600);
 
-    // ── 본문 입력: execCommand('insertHTML') ──────────
+    // ── 2. 본문 에디터 찾기 ──────────────────────────────
     const contentSelectors = [
       '.se-content',
       '.se-main-container [contenteditable="true"]',
       '[role="textbox"]',
     ];
     let contentEl = null;
+    let targetDoc = document;
+
+    // 메인 문서에서 먼저 탐색
     for (const sel of contentSelectors) {
       const els = document.querySelectorAll(sel);
-      // 높이가 있는 요소 우선
       for (const el of els) {
         if (el.offsetHeight > 50) { contentEl = el; break; }
       }
       if (contentEl) break;
     }
 
+    // iframe 내부 탐색
     if (!contentEl) {
-      // iframe 내부 탐색
       for (const iframe of document.querySelectorAll('iframe')) {
         try {
           const doc = iframe.contentDocument || iframe.contentWindow.document;
           for (const sel of contentSelectors) {
             const el = doc.querySelector(sel);
-            if (el && el.offsetHeight > 50) { contentEl = el; break; }
+            if (el && el.offsetHeight > 50) { contentEl = el; targetDoc = doc; break; }
           }
           if (contentEl) break;
         } catch (e) {}
@@ -160,19 +168,50 @@ function insertDraftIntoEditor(title, content) {
     if (!contentEl) return { success: false, error: '에디터 본문 영역을 찾지 못했습니다.' };
 
     contentEl.click();
-    contentEl.focus();
     await sleep(400);
+    contentEl.focus();
+    await sleep(300);
 
-    // 전체 선택 후 HTML 삽입
-    document.execCommand('selectAll', false, null);
-    const inserted = document.execCommand('insertHTML', false, content);
+    // ── 3. DataTransfer paste 시뮬레이션 (가장 자연스러운 방식) ──
+    // 기존 내용 전체 선택
+    targetDoc.execCommand('selectAll', false, null);
+    await sleep(100);
 
-    if (!inserted) {
-      // fallback: innerHTML 직접 설정
-      contentEl.innerHTML = content;
-      contentEl.dispatchEvent(new Event('input', { bubbles: true }));
+    // DataTransfer 객체로 paste 이벤트 생성
+    const dt = new DataTransfer();
+    dt.setData('text/html', content);
+    dt.setData('text/plain', content.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim());
+
+    const pasteEvent = new ClipboardEvent('paste', {
+      clipboardData: dt,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    const handled = contentEl.dispatchEvent(pasteEvent);
+
+    await sleep(500);
+
+    // ── 4. paste 이벤트 미처리 시 execCommand fallback ──
+    // 에디터가 비어있으면 fallback 시도
+    const isEmpty = (contentEl.textContent || '').trim() === '' ||
+                    (contentEl.innerHTML || '').trim() === '' ||
+                    (contentEl.innerHTML || '').trim() === '<p><br></p>';
+
+    if (isEmpty) {
+      // execCommand insertHTML 시도
+      const inserted = targetDoc.execCommand('insertHTML', false, content);
+
+      if (!inserted || isEmpty) {
+        // 최후 수단: innerHTML 직접 + 이벤트 발생
+        contentEl.innerHTML = content;
+        ['input', 'change', 'keyup'].forEach(evtName => {
+          contentEl.dispatchEvent(new Event(evtName, { bubbles: true }));
+        });
+      }
     }
 
+    await sleep(300);
     return { success: true };
   }
 
