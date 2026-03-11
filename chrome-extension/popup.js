@@ -108,16 +108,24 @@ function insertDraftIntoEditor(title, content) {
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   // 메인 문서 + 모든 iframe에서 contenteditable="true" 요소 전부 수집
+  // aria-hidden / 화면 밖 / 너무 좁은 요소(클립보드 헬퍼 등)는 제외
   function collectAllEditables() {
     const list = [];
+    const isUsable = (el) => {
+      if (el.getAttribute('aria-hidden') === 'true') return false;
+      const rect = el.getBoundingClientRect();
+      if (rect.left < -500 || rect.top < -500) return false;  // 화면 밖
+      if (rect.width < 20) return false;                       // 너무 좁음
+      return el.offsetHeight > 0;
+    };
     document.querySelectorAll('[contenteditable="true"]').forEach(el => {
-      list.push({ el, doc: document });
+      if (isUsable(el)) list.push({ el, doc: document });
     });
     document.querySelectorAll('iframe').forEach(iframe => {
       try {
         const doc = iframe.contentDocument || iframe.contentWindow.document;
         doc.querySelectorAll('[contenteditable="true"]').forEach(el => {
-          list.push({ el, doc });
+          if (isUsable(el)) list.push({ el, doc });
         });
       } catch (e) {}
     });
