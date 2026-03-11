@@ -9,6 +9,16 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  const handleDeleteDraft = async (id) => {
+    if (!window.confirm('이 초안을 삭제하시겠습니까?')) return;
+    try {
+      await draftApi.delete(id);
+      setDrafts(prev => prev.filter(d => d.id !== id));
+    } catch (e) {
+      alert('삭제 실패: ' + e.message);
+    }
+  };
+
   useEffect(() => {
     Promise.all([postApi.getHistory(), draftApi.getAll()])
       .then(([h, d]) => {
@@ -107,6 +117,13 @@ export default function HistoryPage() {
                     onClick={() => navigate(`/editor/${draft.id}`)}
                   >
                     {draft.status === 'POSTED' ? '보기' : '편집'}
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ color: '#ff4757' }}
+                    onClick={() => handleDeleteDraft(draft.id)}
+                  >
+                    삭제
                   </button>
                 </div>
               </div>
