@@ -120,7 +120,7 @@ private String toMobileNaverUrl(String url) {
 
 ---
 
-## 2026-03-06 (QA 세션 - AI 생성 및 자동 발행)
+## 2026-03-06 (QA 세션 - AI 생성)
 
 ### [ERR-007] POST /api/drafts → 500 Internal Server Error
 
@@ -178,107 +178,7 @@ if (draft.getCategory() == null) draft.setCategory("여행");
 
 ---
 
-### [ERR-011] AES-256 암호화 실패 - "암호화 실패" 오류
-
-**발생 위치:** `backend/.../util/EncryptionUtil.java`
-
-**원인:**
-AES 키 길이는 16/24/32 bytes여야 하는데, 설정된 암호화 키가 30자라 패딩 후에도 잘못된 크기
-
-**해결:**
-```java
-// 변경 전: 16바이트로 패딩
-private byte[] getPaddedKey(String key) { /* pad to 16 */ }
-
-// 변경 후: 항상 32바이트로 패딩 (AES-256)
-private byte[] getPaddedKey(String key) {
-    byte[] keyBytes = new byte[32];
-    byte[] src = key.getBytes(StandardCharsets.UTF_8);
-    System.arraycopy(src, 0, keyBytes, 0, Math.min(src.length, 32));
-    return keyBytes;
-}
-```
-
----
-
-### [ERR-012] Selenium - 네이버 로그인 캡차 / 봇 감지
-
-**증상:** 로그인 시 `WAITING_CAPTCHA` 상태에서 타임아웃
-
-**원인:** Headless Chrome이 네이버 봇 감지 시스템에 감지됨
-
-**해결:**
-- `--headless=new` 옵션 제거 → 실제 브라우저 창으로 실행
-- `navigator.webdriver` 감지 우회 JS 주입
-- `excludeSwitches: ["enable-automation"]` 옵션 추가
-- 캡차 발생 시 상태를 `WAITING_CAPTCHA`로 설정, 사용자가 직접 해결 가능
-
----
-
-### [ERR-013] Selenium - 발행 버튼 클릭 불가 (element not interactable)
-
-**증상:** 발행 버튼을 찾았으나 `ElementNotInteractableException` 발생
-
-**원인:** 버튼 위에 오버레이 또는 다른 요소가 덮고 있어 일반 click() 불가
-
-**해결:** JavascriptExecutor로 JS click 사용
-```java
-((JavascriptExecutor) driver).executeScript("arguments[0].click();", publishBtn);
-```
-
----
-
-### [ERR-014] Selenium - 로그인 후 URL이 nidlogin에서 변경되지 않음
-
-**증상:** 로그인 버튼 클릭 후 URL이 계속 nidlogin 페이지에 머묾
-
-**원인:** 캡차/2FA 처리 시간을 기다리지 않고 바로 URL 체크
-
-**해결:** `waitForLoginComplete()` 메서드 추가 - 최대 3분간 URL 변경 대기
-```java
-private String waitForLoginComplete(WebDriver driver, Long draftId, int timeoutSeconds)
-```
-
----
-
-### [ERR-015] Selenium - "예약 발행 글" 모달 오픈 (잘못된 버튼 클릭)
-
-**증상:** 발행 시 "예약 발행 글이 없습니다" 모달 팝업
-
-**원인:** XPath `//button[contains(text(),'발행')]`이 툴바의 "예약발행 현황" 버튼을 먼저 매칭
-
-**해결:**
-- `"예약"` 포함 버튼 명시적 제외 필터 추가
-- JS로 `innerText.trim() === '발행'` 정확 매칭 우선 적용
-- `defaultContent()`로 전환 후 탐색
-
----
-
-### [ERR-016] Selenium - 발행 설정 패널의 확인 버튼을 찾지 못함
-
-**증상:** 발행 설정 패널이 열렸으나 15초 대기 후 `WARN: 발행하기 버튼을 찾지 못함`
-
-**원인:**
-패널 내 확인 버튼의 텍스트가 "발행하기"가 아니라 **"발행"** 임을 모름
-(로그에서 버튼 목록을 찍어 확인: `"발행 설정 닫기"` 이후에 오는 `"발행"` 버튼이 확인 버튼)
-
-**버튼 목록 (실제 로그):**
-```
-"예약 발행 0건", "저장", "발행"(툴바), ..., "발행 설정 닫기", "발행"(확인)
-```
-
-**해결:**
-```javascript
-// "발행 설정 닫기" 이후에 오는 "발행" 버튼 찾기
-var closeIdx = btns.findIndex(b => b.innerText.includes('발행 설정 닫기'));
-for (var i = closeIdx + 1; i < btns.length; i++) {
-    if (btns[i].innerText.trim() === '발행') return btns[i];
-}
-```
-
----
-
-### [ERR-017] Maven 빌드 실패 - Java 버전 불일치
+### [ERR-011] Maven 빌드 실패 - Java 버전 불일치
 
 **오류 메시지:**
 ```
@@ -291,6 +191,76 @@ Fatal error compiling: error: release version 17 not supported
 ```bash
 JAVA_HOME=$(/usr/libexec/java_home -v 17) mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
+
+---
+
+## 2026-03-10 (배포)
+
+### [ERR-012] Render Dockerfile 경로 오류
+
+**오류 메시지:**
+```
+failed to read dockerfile: open Dockerfile: no such file or directory
+```
+
+**원인:** `render.yaml`의 `dockerfilePath: ./Dockerfile`이 repo 루트 기준인데 루트에 Dockerfile 없음
+
+**해결:** repo 루트에 Dockerfile 생성. `COPY` 경로를 `backend/` 기준으로 수정
+
+---
+
+### [ERR-013] Spring Security 추가 후 CORS 에러
+
+**증상:** Spring Security 의존성 추가 후 프론트엔드에서 API 호출 시 CORS 오류
+
+**원인:** Security FilterChain이 CORS preflight(OPTIONS)를 차단
+
+**해결:**
+```java
+// WebConfig에서 CORS 매핑을 /**로 변경
+registry.addMapping("/**").allowedOrigins(...);
+// SecurityConfig에서 cors() 활성화
+http.cors(Customizer.withDefaults())
+```
+
+---
+
+## 2026-03-11 (크롬 익스텐션 본문 삽입)
+
+### [ERR-014] 크롬 익스텐션 - 에디터 본문 영역을 찾지 못함
+
+**증상:** "에디터 본문 영역을 찾지 못했습니다" 알림
+
+**원인:** 셀렉터가 너무 구체적 (`.se-main-container`, `#postViewArea` 등)이어서 SmartEditor ONE 실제 DOM과 불일치
+
+**해결:** `[contenteditable="true"]` 전체 수집 → aria-hidden / 오프스크린(left < -500px, width < 20px) 필터 → 높이 내림차순 정렬 → 가장 큰 영역 = 본문 에디터
+
+---
+
+### [ERR-015] 크롬 익스텐션 - 클립보드 헬퍼 div가 에디터로 오인식
+
+**증상:** SmartEditor ONE의 숨겨진 `<div contenteditable="true" aria-hidden="true" style="left:-9999px; width:17px">` 가 가장 먼저 선택됨
+
+**원인:** aria-hidden 및 오프스크린 요소 필터링 미적용
+
+**해결:** 선택 전 필터 추가
+```javascript
+// aria-hidden 제외
+if (el.getAttribute('aria-hidden') === 'true') continue;
+// 오프스크린 요소 제외
+const rect = el.getBoundingClientRect();
+if (rect.left < -500 || rect.width < 20) continue;
+```
+
+---
+
+### [ERR-016] 크롬 익스텐션 - 본문이 마우스 커서 위치에 삽입됨
+
+**증상:** 붙여넣기가 에디터 본문 전체가 아닌 마우스가 마지막으로 클릭한 위치에 삽입됨
+
+**원인:** SmartEditor ONE은 DataTransfer paste 이벤트를 현재 커서(selection) 위치 기준으로 처리. `range.selectNodeContents(el)` 후 paste 이벤트를 dispatching해도 내부 커서가 변경되지 않음
+
+**해결:** 제목 따로 삽입하는 방식을 포기. 제목을 `<h2>` 태그로 본문 상단에 포함시키고, 전체 본문 일괄 삽입. 제목 필드는 사용자가 직접 입력하도록 안내.
 
 ---
 
@@ -313,26 +283,52 @@ VITE_API_BASE_URL=http://localhost:8080
 
 ---
 
-## 2026-03-06 (QA 세션)
+## 2026-03-10 (배포)
 
-### [ERR-F002] 글 작성 POST 요청 시 category 필드 누락
+### [ERR-F002] Vercel 배포 후 API 호출 Network Error
 
-**증상:** 드래프트 생성 API 호출 시 500 에러 (ERR-007과 연계)
+**증상:** 배포 후 모든 API 요청 실패
 
-**원인:** 프론트 UI에 카테고리 선택 기능 없어 요청 body에 `category` 필드 미포함
+**원인:** `VITE_API_BASE_URL` 환경변수를 Vercel에 미설정 → undefined로 axios 요청
 
-**해결 (임시):** 백엔드에서 null이면 `"여행"` 기본값 처리 (ERR-007 참조)
+**해결:**
+```bash
+vercel env add VITE_API_BASE_URL production
+# 값: https://naver-blog-backend.onrender.com
+vercel --prod --yes
+```
 
 ---
 
-### [ERR-F003] 발행 히스토리 "네이버 블로그에서 보기" 클릭 시 편집 창으로 이동
+## 2026-03-11 (다중 사용자 인증)
 
-**증상:** 발행 완료 후 저장된 URL이 `postwrite` URL이어서 블로그 글이 아닌 편집 페이지로 연결
+### [ERR-F003] 설정 페이지 제거 후 메뉴에 계속 표시됨
 
-**원인:**
-Selenium 발행 프로세스가 완료되지 않아 URL이 변경되지 않은 상태(`postwrite`)로 DB에 저장됨.
-실제 발행 확인 버튼("발행")이 클릭되지 않았기 때문 (ERR-016 참조)
+**증상:** 코드에서 Settings 라우트를 제거했으나 Vercel에 배포된 버전에는 여전히 표시
 
-**해결 중:** ERR-016 해결 후 정상 발행 URL 저장 예정
+**원인:** 코드 변경 후 Vercel 재배포를 하지 않음
+
+**해결:**
+```bash
+cd frontend
+vercel --prod --yes
+```
+
+---
+
+### [ERR-F004] 401 응답 후 무한 리디렉션
+
+**증상:** 토큰 만료 시 `/login`으로 리디렉션 되어야 하는데 빈 화면 또는 루프 발생 가능
+
+**원인:** axiosClient 응답 인터셉터에서 localStorage.removeItem 후 `window.location.href = '/login'` 처리 필요
+
+**해결:**
+```javascript
+// axiosClient.js 응답 인터셉터
+if (error.response?.status === 401) {
+  localStorage.removeItem('token');
+  window.location.href = '/login';
+}
+```
 
 ---

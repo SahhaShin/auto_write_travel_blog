@@ -3,7 +3,8 @@
 ## 프로젝트 개요
 
 기존 네이버 블로그 글의 문체를 AI가 학습하여, 이미지와 여행 계획 입력만으로 동일 스타일의 블로그 초안을 자동 생성하는 풀스택 웹앱.
-생성된 초안은 크롬 익스텐션으로 네이버 블로그 글쓰기 페이지에 삽입, 제목은 사용자가 직접 입력 후 발행.
+생성된 초안은 크롬 익스텐션으로 네이버 블로그 글쓰기 페이지에 삽입. 제목은 사용자가 직접 입력 후 발행.
+다중 사용자 지원: 회원가입/로그인 후 각자의 데이터만 접근 가능.
 
 ---
 
@@ -12,9 +13,10 @@
 | 영역 | 기술 |
 |------|------|
 | Frontend | React 19 + Vite 7 |
-| Backend | Spring Boot 3.2 (Java 17) + MyBatis |
+| Backend | Spring Boot 3.2 (Java 17) + Spring Security + MyBatis |
 | Database | TiDB Cloud Serverless (MySQL 8 호환) |
 | AI | Claude API (`claude-sonnet-4-6`) + Gemini 2.5-flash (fallback) |
+| 인증 | JWT (JJWT 0.12.5) + BCrypt |
 | 이미지 저장 | Cloudinary (Render ephemeral fs 대체) |
 | 에디터 | TipTap (ProseMirror 기반) |
 | 크롬 익스텐션 | Manifest V3, MAIN world scripting |
@@ -27,8 +29,8 @@
 ```
 auto-blog/
 ├── Dockerfile                  # 루트 Dockerfile (Render 배포용, build context = repo root)
-├── render.yaml                 # Render 배포 설정
-├── chrome-extension/           # 크롬 익스텐션
+├── render.yaml
+├── chrome-extension/
 │   ├── manifest.json
 │   ├── popup.html / popup.js   # 초안 선택 + 본문 삽입 (MAIN world)
 │   └── content.js
@@ -36,22 +38,57 @@ auto-blog/
 │   ├── pom.xml
 │   └── src/main/
 │       ├── java/com/shincha/naverblog/
-│       │   ├── controller/     # REST 컨트롤러 5개
-│       │   ├── model/dto/      # DTO 클래스
-│       │   ├── model/dao/      # MyBatis DAO 인터페이스
-│       │   └── model/service/  # 서비스 구현체
+│       │   ├── config/
+│       │   │   ├── SecurityConfig.java   # Spring Security + BCryptPasswordEncoder @Bean
+│       │   │   └── WebConfig.java        # CORS
+│       │   ├── security/
+│       │   │   └── JwtFilter.java        # Authorization 헤더 파싱, principal = userId(Long)
+│       │   ├── util/
+│       │   │   └── JwtUtil.java          # generate(userId, username), extractUserId, isValid
+│       │   ├── controller/
+│       │   │   ├── AuthController.java   # POST /api/auth/register, /api/auth/login
+│       │   │   ├── DraftController.java
+│       │   │   ├── StyleController.java
+│       │   │   ├── GenerateController.java
+│       │   │   ├── ImageController.java
+│       │   │   └── PostController.java
+│       │   └── model/
+│       │       ├── dto/         # User, BlogDraft, BlogStyleSample, BlogImage, PostHistory
+│       │       ├── dao/         # UserDao, DraftDao, StyleDao, ImageDao, PostHistoryDao
+│       │       └── service/     # ClaudeServiceImpl, StyleServiceImpl, DraftServiceImpl, ImageServiceImpl
 │       └── resources/
 │           ├── application.properties
 │           ├── application-local.properties  # gitignore, 로컬 전용
-│           ├── schema.sql
-│           └── mappers/        # MyBatis XML 매퍼 4개
+│           └── mappers/         # UserMapper, DraftMapper, StyleMapper, ImageMapper, PostHistoryMapper
 └── frontend/
     ├── src/
-    │   ├── api/                # axiosClient + 4개 API 모듈
-    │   └── pages/              # 4개 페이지 컴포넌트
+    │   ├── api/
+    │   │   ├── axiosClient.js   # 요청 인터셉터(JWT 첨부) + 응답 인터셉터(401→/login)
+    │   │   └── ...              # styleApi, draftApi, imageApi, generateApi, postApi
+    │   └── pages/
+    │       ├── LoginPage.jsx
+    │       ├── RegisterPage.jsx
+    │       ├── CreatePostPage.jsx
+    │       ├── EditorPage.jsx
+    │       ├── StyleReferencePage.jsx
+    │       └── HistoryPage.jsx
     ├── vercel.json
     └── package.json
 ```
+
+---
+
+## 인증 구조
+
+- `/api/auth/register`, `/api/auth/login` → 공개 (JWT 불필요)
+- 그 외 모든 `/api/**` → `Authorization: Bearer <token>` 필수
+- JWT payload: `subject = userId(Long)`, claim `username`
+- JwtFilter: `SecurityContextHolder`의 `principal = userId(Long)`
+- 각 컨트롤러에서 userId 추출:
+  ```java
+  Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+  ```
+- 데이터 격리: `blog_drafts.user_id`, `blog_style_samples.user_id` 컬럼으로 필터링
 
 ---
 
@@ -102,17 +139,17 @@ vercel --prod --yes
 
 - git push → Render 자동 배포 (Auto-Deploy)
 - Dockerfile 위치: repo 루트 `/Dockerfile` (build context = repo root)
-- `render.yaml`에 `rootDir` 없음, `dockerfilePath: ./Dockerfile`
 
 **Render 환경변수:**
 
 | Key | 비고 |
 |-----|------|
-| `DB_URL` | `jdbc:mysql://gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/naver_blog_auto?useSSL=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true` |
+| `DB_URL` | TiDB Cloud JDBC URL |
 | `DB_USERNAME` | TiDB 사용자명 |
 | `DB_PASSWORD` | TiDB 비밀번호 |
 | `CLAUDE_API_KEY` | Anthropic API 키 |
 | `GEMINI_API_KEY` | Google AI Studio 키 (무료, fallback용) |
+| `JWT_SECRET` | 32자 이상 임의 문자열 (필수) |
 | `CORS_ORIGINS` | `https://frontend-blush-seven-53.vercel.app` |
 | `UPLOAD_DIR` | `/app/uploads` |
 | `CLOUDINARY_CLOUD_NAME` | Cloudinary 클라우드명 |
@@ -123,8 +160,9 @@ vercel --prod --yes
 
 - 클러스터: ap-southeast-1 (Singapore), Serverless Free
 - DB명: `naver_blog_auto`
-- 테이블: `blog_style_samples`, `blog_drafts`, `blog_images`, `post_history`
+- 테이블: `users`, `blog_style_samples`, `blog_drafts`, `blog_images`, `post_history`
 - 스키마 변경 시 TiDB 콘솔 SQL Editor에서 수동 실행 필요
+- 상세 SQL은 DEPLOY.md 참고
 
 ---
 
@@ -143,6 +181,7 @@ vercel --prod --yes
 - **Java**: 로컬 기본 Java가 11이므로 빌드/실행 시 `JAVA_HOME` 명시 필수
 - **Render 슬립**: 무료 플랜 15분 비활성 → 첫 요청 50초+ 지연
 - **schema.sql 자동 실행 안됨**: DB 스키마 변경 시 TiDB 콘솔에서 직접 실행
-- **render.yaml vs 대시보드**: 기존 서비스는 대시보드 설정이 우선
-- **Cloudinary**: 이미지 영구 저장. 미설정 시 로컬 uploads 폴더에 저장 (Render에서는 재배포 시 삭제됨)
+- **JWT_SECRET**: 운영 환경에서 반드시 강력한 키 설정. 기본값은 dev 전용
+- **Cloudinary**: 이미지 영구 저장. 미설정 시 로컬 uploads에 저장 (Render 재배포 시 삭제됨)
 - **크롬 익스텐션**: 제목은 SmartEditor ONE API 접근 불가로 사용자가 직접 입력. 본문만 자동 삽입
+- **데이터 격리**: 모든 조회/생성 API는 JWT의 userId 기반으로 자신의 데이터만 접근 가능

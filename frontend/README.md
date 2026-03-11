@@ -1,16 +1,50 @@
-# React + Vite
+# Frontend — 네이버 블로그 AI 초안 생성
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + Vite 7 기반 프론트엔드.
 
-Currently, two official plugins are available:
+## 실행
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+npm install
+npm run dev
+```
 
-## React Compiler
+브라우저: `http://localhost:5173`
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 환경변수
 
-## Expanding the ESLint configuration
+`frontend/.env` 파일 생성:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```env
+VITE_API_BASE_URL=http://localhost:8080
+```
+
+운영 환경에서는 Vercel 환경변수로 설정:
+```bash
+vercel env add VITE_API_BASE_URL production
+# 값: https://naver-blog-backend.onrender.com
+```
+
+## 배포
+
+```bash
+vercel --prod --yes
+```
+
+## 페이지 구성
+
+| 경로 | 컴포넌트 | 설명 |
+|------|----------|------|
+| `/login` | LoginPage | 로그인 (JWT) |
+| `/register` | RegisterPage | 회원가입 |
+| `/create` | CreatePostPage | 이미지 업로드 + 여행 계획 입력 |
+| `/editor/:draftId` | EditorPage | TipTap 에디터 + AI 생성 |
+| `/styles` | StyleReferencePage | 스타일 참고 글 관리 |
+| `/history` | HistoryPage | 초안 목록 + 삭제 |
+
+## 인증
+
+- 로그인/회원가입 성공 시 JWT를 `localStorage`에 저장
+- `axiosClient.js`가 모든 요청에 `Authorization: Bearer <token>` 자동 첨부
+- 401 응답 시 토큰 삭제 후 `/login`으로 자동 이동
+- 미인증 상태에서 보호 라우트 접근 시 `/login`으로 리디렉션 (`RequireAuth`)
