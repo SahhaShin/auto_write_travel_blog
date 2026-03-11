@@ -1,11 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { postApi } from '../api/postApi';
 
 export default function SettingsPage() {
+  const [current, setCurrent] = useState(null);   // 저장된 자격증명
+  const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ naverId: '', naverPassword: '', blogId: '' });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    postApi.getCredentials()
+      .then(data => {
+        if (data.exists) setCurrent(data);
+        else setEditing(true); // 저장된 정보 없으면 바로 편집 모드
+      })
+      .catch(() => setEditing(true));
+  }, []);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -14,6 +25,9 @@ export default function SettingsPage() {
     setError('');
     try {
       await postApi.saveCredentials(form);
+      const updated = await postApi.getCredentials();
+      setCurrent(updated);
+      setEditing(false);
       setSuccess(true);
       setForm({ naverId: '', naverPassword: '', blogId: '' });
     } catch (e) {
@@ -23,6 +37,12 @@ export default function SettingsPage() {
     }
   };
 
+  const handleEditClick = () => {
+    setSuccess(false);
+    setError('');
+    setEditing(true);
+  };
+
   return (
     <div>
       <h1 className="section-title">설정</h1>
@@ -30,58 +50,92 @@ export default function SettingsPage() {
       <div className="card">
         <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>네이버 로그인 정보</h2>
         <p style={{ color: '#888', fontSize: 13, marginBottom: 20 }}>
-          자동 포스팅을 위해 네이버 로그인 정보를 설정하세요.
-          입력된 정보는 AES-256으로 암호화되어 저장됩니다.
-          <br />
-          <strong style={{ color: '#ff4757' }}>주의: 2차 인증(OTP)이 활성화된 경우 자동 포스팅이 실패할 수 있습니다.</strong>
+          자동 포스팅에 사용할 네이버 계정 정보입니다. AES-256으로 암호화되어 저장됩니다.
         </p>
 
-        <form onSubmit={handleSave}>
-          <div className="form-group">
-            <label>네이버 아이디</label>
-            <input
-              type="text"
-              placeholder="네이버 아이디"
-              value={form.naverId}
-              onChange={e => setForm({...form, naverId: e.target.value})}
-              required
-              autoComplete="off"
-            />
+        {/* 읽기 모드 */}
+        {!editing && current?.exists && (
+          <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+              <div style={rowStyle}>
+                <span style={labelStyle}>네이버 아이디</span>
+                <span style={valueStyle}>{current.naverId}</span>
+              </div>
+              <div style={rowStyle}>
+                <span style={labelStyle}>비밀번호</span>
+                <span style={{ ...valueStyle, fontFamily: 'monospace', fontSize: 12, color: '#aaa', wordBreak: 'break-all' }}>
+                  {current.encryptedPassword}
+                </span>
+              </div>
+              <div style={rowStyle}>
+                <span style={labelStyle}>블로그 URL</span>
+                <span style={valueStyle}>
+                  {current.blogId
+                    ? `https://blog.naver.com/${current.blogId}`
+                    : <span style={{ color: '#aaa' }}>미설정</span>}
+                </span>
+              </div>
+            </div>
+            {success && (
+              <p style={{ color: '#03c75a', fontSize: 13, marginBottom: 12, fontWeight: 600 }}>
+                로그인 정보가 업데이트되었습니다.
+              </p>
+            )}
+            <button className="btn btn-secondary" onClick={handleEditClick}>수정</button>
           </div>
-          <div className="form-group">
-            <label>네이버 비밀번호</label>
-            <input
-              type="password"
-              placeholder="네이버 비밀번호"
-              value={form.naverPassword}
-              onChange={e => setForm({...form, naverPassword: e.target.value})}
-              required
-              autoComplete="new-password"
-            />
-          </div>
-          <div className="form-group">
-            <label>블로그 ID (URL 경로)</label>
-            <input
-              type="text"
-              placeholder="예: myblog123 (blog.naver.com/myblog123)"
-              value={form.blogId}
-              onChange={e => setForm({...form, blogId: e.target.value})}
-            />
-          </div>
+        )}
 
-          {success && (
-            <p style={{ color: '#03c75a', fontSize: 13, marginBottom: 12, fontWeight: 600 }}>
-              로그인 정보가 안전하게 저장되었습니다.
-            </p>
-          )}
-          {error && (
-            <p style={{ color: '#ff4757', fontSize: 13, marginBottom: 12 }}>{error}</p>
-          )}
+        {/* 편집 모드 */}
+        {editing && (
+          <form onSubmit={handleSave}>
+            <div className="form-group">
+              <label>네이버 아이디</label>
+              <input
+                type="text"
+                placeholder="네이버 아이디"
+                value={form.naverId}
+                onChange={e => setForm({ ...form, naverId: e.target.value })}
+                required
+                autoComplete="off"
+              />
+            </div>
+            <div className="form-group">
+              <label>네이버 비밀번호</label>
+              <input
+                type="password"
+                placeholder="네이버 비밀번호"
+                value={form.naverPassword}
+                onChange={e => setForm({ ...form, naverPassword: e.target.value })}
+                required
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="form-group">
+              <label>블로그 ID (URL 경로)</label>
+              <input
+                type="text"
+                placeholder="예: myblog123 (blog.naver.com/myblog123)"
+                value={form.blogId}
+                onChange={e => setForm({ ...form, blogId: e.target.value })}
+              />
+            </div>
 
-          <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? <span className="spinner" /> : '저장'}
-          </button>
-        </form>
+            {error && (
+              <p style={{ color: '#ff4757', fontSize: 13, marginBottom: 12 }}>{error}</p>
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="submit" className="btn btn-primary" disabled={saving}>
+                {saving ? <span className="spinner" /> : '저장'}
+              </button>
+              {current?.exists && (
+                <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>
+                  취소
+                </button>
+              )}
+            </div>
+          </form>
+        )}
       </div>
 
       <div className="card">
@@ -97,3 +151,27 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+const rowStyle = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 12,
+  padding: '10px 14px',
+  background: '#f8f9fa',
+  borderRadius: 8,
+};
+
+const labelStyle = {
+  fontSize: 13,
+  color: '#888',
+  minWidth: 100,
+  flexShrink: 0,
+  paddingTop: 1,
+};
+
+const valueStyle = {
+  fontSize: 14,
+  color: '#222',
+  fontWeight: 500,
+  wordBreak: 'break-all',
+};

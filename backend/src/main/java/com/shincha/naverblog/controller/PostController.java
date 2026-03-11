@@ -51,6 +51,23 @@ public class PostController {
         return ResponseEntity.ok(Map.of("message", "OTP가 제출되었습니다."));
     }
 
+    // 네이버 자격증명 조회
+    @GetMapping("/api/credentials")
+    public ResponseEntity<?> getCredentials() {
+        try {
+            NaverCredentials creds = credentialsDao.find();
+            if (creds == null) return ResponseEntity.ok(Map.of("exists", false));
+            return ResponseEntity.ok(Map.of(
+                "exists", true,
+                "naverId", encryptionUtil.decrypt(creds.getEncryptedId()),
+                "encryptedPassword", creds.getEncryptedPassword(),
+                "blogId", creds.getBlogId() != null ? creds.getBlogId() : ""
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // 네이버 자격증명 저장/업데이트
     @PutMapping("/api/credentials")
     public ResponseEntity<?> saveCredentials(@RequestBody Map<String, String> body) {
