@@ -12,17 +12,16 @@ RUN mvn clean package -DskipTests
 # ============================
 FROM eclipse-temurin:17-jdk-jammy
 
-# Chrome 및 ChromeDriver 설치 (Selenium 자동 포스팅용)
-RUN apt-get update && apt-get install -y \
-    chromium-browser \
-    chromium-chromedriver \
-    fonts-nanum \
-    --no-install-recommends \
+# Google Chrome 설치 (Ubuntu 22.04에서 chromium-browser는 snap으로 redirect되어 Docker에서 동작 안 함)
+RUN apt-get update && apt-get install -y wget gnupg fonts-nanum --no-install-recommends \
+    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list \
+    && apt-get update && apt-get install -y google-chrome-stable --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# ChromeDriver 경로 설정
-ENV CHROME_BIN=/usr/bin/chromium-browser
-ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
+# ChromeDriver는 WebDriverManager가 런타임에 자동 다운로드
+ENV CHROME_BIN=/usr/bin/google-chrome-stable
+ENV CHROMEDRIVER_PATH=
 
 WORKDIR /app
 
