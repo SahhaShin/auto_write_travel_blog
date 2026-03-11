@@ -5,40 +5,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   const { title, content } = message.draft;
 
-  try {
-    insertTitle(title);
-    setTimeout(() => {
-      insertContent(content);
+  (async () => {
+    try {
+      await insertTitle(title);
+      await sleep(600);
+      await insertContent(content);
       sendResponse({ success: true });
-    }, 800);
-  } catch (e) {
-    sendResponse({ success: false, error: e.message });
-  }
+    } catch (e) {
+      sendResponse({ success: false, error: e.message });
+    }
+  })();
 
-  return true; // 비동기 응답
+  return true; // 비동기 응답 유지
 });
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // ── 제목 입력 ──────────────────────────────────────────
-function insertTitle(title) {
+async function insertTitle(title) {
   if (!title) return;
 
   const selectors = [
     '.se-title-input',
     '[contenteditable="true"].se-title-input',
     '[data-placeholder="제목"]',
-    'div[contenteditable="true"]:first-of-type',
   ];
 
-  let el = null;
-  for (const sel of selectors) {
-    el = document.querySelector(sel);
-    if (el) break;
-  }
+  let el = findElement(selectors);
 
+  // iframe 내부 탐색
   if (!el) {
-    // iframe 안에서 탐색
-    const iframes = document.querySelectorAll('iframe');
-    for (const iframe of iframes) {
+    for (const iframe of document.querySelectorAll('iframe')) {
       try {
         const doc = iframe.contentDocument || iframe.contentWindow.document;
         for (const sel of selectors) {
@@ -52,83 +51,98 @@ function insertTitle(title) {
 
   if (el) {
     el.focus();
-    el.textContent = '';
+    await sleep(200);
+    // 기존 내용 전체 선택 후 교체
     document.execCommand('selectAll', false, null);
     document.execCommand('insertText', false, title);
-    el.dispatchEvent(new Event('input', { bubbles: true }));
   }
 }
 
-// ── 본문 입력 ──────────────────────────────────────────
-function insertContent(htmlContent) {
+// ── 본문 입력: 클립보드 붙여넣기 방식 ─────────────────
+async function insertContent(htmlContent) {
   if (!htmlContent) return;
 
-  // SmartEditor ONE: .se-content 또는 [role="textbox"]
-  const selectors = [
+  // 에디터 본문 영역 포커스
+  const editorSelectors = [
     '.se-content',
-    '.se-main-container [role="textbox"]',
     '[role="textbox"]',
+    '.se-main-container [contenteditable="true"]',
     '.se-component-content',
   ];
 
-  let el = null;
+  let editorEl = findElement(editorSelectors);
   let targetDoc = document;
 
-  // 먼저 메인 문서에서 탐색
-  for (const sel of selectors) {
-    el = document.querySelector(sel);
-    if (el) break;
-  }
-
-  // 없으면 iframe 내부 탐색
-  if (!el) {
-    const iframes = document.querySelectorAll('iframe');
-    for (const iframe of iframes) {
+  if (!editorEl) {
+    for (const iframe of document.querySelectorAll('iframe')) {
       try {
         const doc = iframe.contentDocument || iframe.contentWindow.document;
-        for (const sel of selectors) {
-          el = doc.querySelector(sel);
-          if (el) {
-            targetDoc = doc;
-            break;
-          }
+        for (const sel of editorSelectors) {
+          editorEl = doc.querySelector(sel);
+          if (editorEl) { targetDoc = doc; break; }
         }
-        if (el) break;
+        if (editorEl) break;
       } catch (e) {}
     }
   }
 
-  if (el) {
-    el.focus();
-    el.innerHTML = htmlContent;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
-    return;
+  if (!editorEl) {
+    throw new Error('SmartEditor 본문 영역을 찾을 수 없습니다.');
   }
 
-  // 마지막 수단: 페이지 컨텍스트에서 SmartEditor API 직접 호출
-  const script = document.createElement('script');
-  script.textContent = `
-    (function() {
-      try {
-        // SmartEditor ONE API 시도
-        var editorList = window.nhn && window.nhn.husky && window.nhn.husky.EZCreator;
-        if (editorList) {
-          var ed = editorList.getEditor('content');
-          if (ed) { ed.exec('PASTE_HTML', [${JSON.stringify(htmlContent)}]); return; }
-        }
-        // contenteditable 강제 주입
-        var all = document.querySelectorAll('[contenteditable=true]');
-        for (var i = 0; i < all.length; i++) {
-          if (all[i].offsetHeight > 100) {
-            all[i].innerHTML = ${JSON.stringify(htmlContent)};
-            all[i].dispatchEvent(new Event('input', {bubbles:true}));
-            break;
-          }
-        }
-      } catch(e) { console.error('초안 입력 오류:', e); }
-    })();
-  `;
-  document.head.appendChild(script);
-  script.remove();
+  // 에디터 클릭 후 포커스
+  editorEl.click();
+  await sleep(400);
+  editorEl.focus();
+  await sleep(300);
+
+  // HTML을 클립보드에 쓰기
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        'text/html': new Blob([htmlContent], { type: 'text/html' }),
+        'text/plain': new Blob([stripHtml(htmlContent)], { type: 'text/plain' }),
+      })
+    ]);
+  } catch (e) {
+    // clipboard API 실패 시 execCommand fallback
+    const tempEl = document.createElement('div');
+    tempEl.innerHTML = htmlContent;
+    document.body.appendChild(tempEl);
+    const range = document.createRange();
+    range.selectNodeContents(tempEl);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.execCommand('copy');
+    document.body.removeChild(tempEl);
+  }
+
+  await sleep(300);
+
+  // 에디터에 붙여넣기 (Ctrl+V 시뮬레이션)
+  editorEl.dispatchEvent(new KeyboardEvent('keydown', {
+    key: 'v', code: 'KeyV', ctrlKey: true, bubbles: true
+  }));
+
+  // execCommand paste 도 시도
+  editorEl.focus();
+  document.execCommand('paste');
+
+  await sleep(500);
+}
+
+// ── 유틸 ──────────────────────────────────────────────
+function findElement(selectors) {
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el) return el;
+  }
+  return null;
+}
+
+function stripHtml(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return div.textContent || div.innerText || '';
 }
