@@ -17,6 +17,7 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -45,6 +46,12 @@ public class NaverAutoPostServiceImpl implements NaverAutoPostService {
 
     private static final Random RANDOM = new Random();
 
+    @Value("${chrome.bin:}")
+    private String chromeBin;
+
+    @Value("${chromedriver.path:}")
+    private String chromedriverPath;
+
     @Override
     public void submitOtp(Long draftId, String otp) {
         otpMap.put(draftId, otp);
@@ -68,7 +75,11 @@ public class NaverAutoPostServiceImpl implements NaverAutoPostService {
             String finalContent = draft.getFinalContent() != null ? draft.getFinalContent() : draft.getGeneratedContent();
 
             // Chrome 드라이버 설정
-            WebDriverManager.chromedriver().setup();
+            if (chromedriverPath != null && !chromedriverPath.isEmpty()) {
+                System.setProperty("webdriver.chrome.driver", chromedriverPath);
+            } else {
+                WebDriverManager.chromedriver().setup();
+            }
             ChromeOptions options = buildChromeOptions();
             driver = new ChromeDriver(options);
 
@@ -176,13 +187,19 @@ public class NaverAutoPostServiceImpl implements NaverAutoPostService {
 
     private ChromeOptions buildChromeOptions() {
         ChromeOptions options = new ChromeOptions();
-        // headless 제거: Naver 봇 감지 우회 + 캡차/2FA 사용자 직접 처리 가능
+        // 서버 환경(Render)에서는 headless 필수 (디스플레이 없음)
+        options.addArguments("--headless=new");
         options.addArguments("--no-sandbox");
         options.addArguments("--disable-dev-shm-usage");
+        options.addArguments("--disable-gpu");
         options.addArguments("--window-size=1920,1080");
+        options.addArguments("--disable-blink-features=AutomationControlled");
         options.addArguments("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36");
         options.setExperimentalOption("excludeSwitches", List.of("enable-automation"));
         options.setExperimentalOption("useAutomationExtension", false);
+        if (chromeBin != null && !chromeBin.isEmpty()) {
+            options.setBinary(chromeBin);
+        }
         return options;
     }
 
