@@ -11,6 +11,7 @@ import { postApi } from '../api/postApi';
 import './EditorPage.css';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const getImageUrl = (publicUrl) => publicUrl?.startsWith('http') ? publicUrl : `${BASE_URL}${publicUrl}`;
 
 const STATUS_MESSAGES = {
   PENDING: '발행 준비 중...',
@@ -93,7 +94,7 @@ export default function EditorPage() {
           data.images.forEach((img, i) => {
             content = content.replace(
               `[IMAGE_${i + 1}]`,
-              `<img src="${BASE_URL}${img.publicUrl}" alt="${img.originalName}" />`
+              `<img src="${getImageUrl(img.publicUrl)}" alt="${img.originalName}" />`
             );
           });
         }
@@ -113,7 +114,7 @@ export default function EditorPage() {
         draft.images.forEach((img, i) => {
           content = content.replace(
             `[IMAGE_${i + 1}]`,
-            `<img src="${BASE_URL}${img.publicUrl}" alt="${img.originalName}" />`
+            `<img src="${getImageUrl(img.publicUrl)}" alt="${img.originalName}" />`
           );
         });
       }
@@ -140,7 +141,7 @@ export default function EditorPage() {
         freshDraft.images.forEach((img, i) => {
           freshContent = freshContent.replace(
             `[IMAGE_${i + 1}]`,
-            `<img src="${BASE_URL}${img.publicUrl}" alt="${img.originalName}" />`
+            `<img src="${getImageUrl(img.publicUrl)}" alt="${img.originalName}" />`
           );
         });
       }
@@ -314,7 +315,7 @@ export default function EditorPage() {
             {draft.images.map((img, i) => (
               <div key={img.id} style={{ textAlign: 'center' }}>
                 <img
-                  src={`${BASE_URL}${img.publicUrl}`}
+                  src={getImageUrl(img.publicUrl)}
                   alt={img.originalName}
                   style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6 }}
                 />
