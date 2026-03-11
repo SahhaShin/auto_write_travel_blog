@@ -169,47 +169,32 @@ function insertDraftIntoEditor(title, content) {
     // 본문 요소: 제목이 아닌 것 중 가장 큰 것
     const bodyEntry = editables.find(({ el }) => el !== titleEntry.el) || editables[0];
 
-    // ── 1. 제목 입력 ────────────────────────────────────
+    // ── 1. 제목 입력 ──────────────────────────────────────────────────────
+    // SmartEditor ONE은 paste 이벤트를 커서 위치 기준으로 처리하므로
+    // paste 대신 __se-node span 직접 조작 방식 사용
     if (title && titleEntry) {
-      const { el: titleEl, doc: titleDoc } = titleEntry;
-      titleEl.click();
-      await sleep(200);
-      titleEl.focus();
-      await sleep(200);
+      const { el: titleEl } = titleEntry;
 
-      // selectAllIn은 titleDoc 기준 range 사용
-      const range = titleDoc.createRange();
-      range.selectNodeContents(titleEl);
-      const sel = titleDoc.defaultView.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      await sleep(100);
+      // p > span.__se-node 구조에서 span 찾기
+      const seNode = titleEl.querySelector('.__se-node');
+      const titleP  = titleEl.querySelector('p') || titleEl;
 
-      // paste 방식으로 통일 (body와 동일)
-      const dt = new DataTransfer();
-      dt.setData('text/plain', title);
-      dt.setData('text/html', `<span>${title}</span>`);
-      const pasted = titleEl.dispatchEvent(new ClipboardEvent('paste', {
-        clipboardData: dt,
+      if (seNode) {
+        // __se-node span 텍스트 직접 교체
+        seNode.textContent = title;
+      } else {
+        // fallback: p 안에 span 생성
+        titleP.innerHTML = `<span class="__se-node">${title}</span>`;
+      }
+
+      // SmartEditor에게 변경 알림
+      titleEl.dispatchEvent(new InputEvent('input', {
         bubbles: true,
         cancelable: true,
+        inputType: 'insertText',
+        data: title,
       }));
-
-      await sleep(200);
-
-      // paste 미처리 → titleDoc.execCommand fallback
-      const titleText = (titleEl.textContent || '').replace(/\s/g, '');
-      if (titleText.length < 2) {
-        titleDoc.execCommand('insertText', false, title);
-        titleEl.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-
-      // 그래도 안 되면 __se-node span 직접 수정
-      if ((titleEl.textContent || '').replace(/\s/g, '').length < 2) {
-        const span = titleEl.querySelector('.__se-node') || titleEl.querySelector('span') || titleEl;
-        span.textContent = title;
-        titleEl.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: title }));
-      }
+      titleEl.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     await sleep(500);
