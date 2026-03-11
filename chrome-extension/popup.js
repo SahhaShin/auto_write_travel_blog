@@ -107,16 +107,21 @@ insertBtn.addEventListener('click', async () => {
 function insertDraftIntoEditor(title, content) {
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-  // 실제 contenteditable="true" 요소 찾기
-  function findEditable(selectors, doc) {
-    for (const sel of selectors) {
-      const els = (doc || document).querySelectorAll(sel);
-      for (const el of els) {
-        // 자기 자신이 contenteditable이고 크기가 있는 경우
-        if (el.isContentEditable && el.offsetHeight > 30) return el;
-      }
-    }
-    return null;
+  // 메인 문서 + 모든 iframe에서 contenteditable="true" 요소 전부 수집
+  function collectAllEditables() {
+    const list = [];
+    document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+      list.push({ el, doc: document });
+    });
+    document.querySelectorAll('iframe').forEach(iframe => {
+      try {
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        doc.querySelectorAll('[contenteditable="true"]').forEach(el => {
+          list.push({ el, doc });
+        });
+      } catch (e) {}
+    });
+    return list;
   }
 
   // 요소 내부만 선택 (document 전체 selectAll 사용 안 함)
@@ -128,110 +133,96 @@ function insertDraftIntoEditor(title, content) {
     sel.addRange(range);
   }
 
-  // DataTransfer paste 시뮬레이션
-  function pasteHTML(el, html, doc) {
-    const dt = new DataTransfer();
-    dt.setData('text/html', html);
-    dt.setData('text/plain', html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-    const evt = new ClipboardEvent('paste', {
-      clipboardData: dt,
-      bubbles: true,
-      cancelable: true,
-    });
-    el.dispatchEvent(evt);
+  // SE 문단 구조로 HTML 변환
+  // SmartEditor ONE은 <p class="se-text-paragraph"> 구조를 사용
+  function buildSEContent(html) {
+    // 이미 <h2>/<p> 태그가 있으면 그대로 사용 (paste가 처리)
+    return html;
   }
 
   async function run() {
-    // ── 1. 제목 입력 ────────────────────────────────────
-    const titleSelectors = [
-      '.se-title-input [contenteditable="true"]',
-      '.se-title-input',
-      '[data-placeholder="제목"]',
-    ];
-    let titleEl = findEditable(titleSelectors, document);
+    const editables = collectAllEditables();
 
-    // iframe 탐색
-    if (!titleEl) {
-      for (const iframe of document.querySelectorAll('iframe')) {
-        try {
-          const doc = iframe.contentDocument || iframe.contentWindow.document;
-          titleEl = findEditable(titleSelectors, doc);
-          if (titleEl) break;
-        } catch (e) {}
-      }
+    if (editables.length === 0) {
+      return { success: false, error: 'contenteditable 요소 없음 — 에디터가 아직 로딩 중일 수 있습니다.' };
     }
 
-    if (titleEl) {
+    // 높이 기준 정렬 (큰 것 = 본문, 작은 것 = 제목)
+    editables.sort((a, b) => b.el.offsetHeight - a.el.offsetHeight);
+
+    // 제목 요소: 'title' 클래스 포함이거나 가장 작은 것
+    const titleEntry = editables.find(({ el }) =>
+      /title/i.test(el.className) || el.closest('[class*="title"]')
+    ) || editables[editables.length - 1];
+
+    // 본문 요소: 가장 큰 것 (단, 제목과 다른 것)
+    const bodyEntry = editables.find(({ el }) => el !== titleEntry.el) || editables[0];
+
+    // ── 1. 제목 입력 ────────────────────────────────────
+    if (title && titleEntry) {
+      const { el: titleEl } = titleEntry;
       titleEl.focus();
       await sleep(200);
       selectAllIn(titleEl);
       await sleep(100);
-      // 선택 후 insertText
       document.execCommand('insertText', false, title);
       titleEl.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
-    await sleep(600);
-
-    // ── 2. 본문 에디터 찾기 ──────────────────────────────
-    const contentSelectors = [
-      // SmartEditor ONE 본문 내 실제 contenteditable
-      '.se-component-content [contenteditable="true"]',
-      '.se-text [contenteditable="true"]',
-      '.se-content [contenteditable="true"]',
-      // fallback
-      '.se-content',
-      '[role="textbox"]',
-    ];
-
-    let contentEl = null;
-    let targetDoc = document;
-
-    contentEl = findEditable(contentSelectors, document);
-
-    if (!contentEl) {
-      for (const iframe of document.querySelectorAll('iframe')) {
-        try {
-          const doc = iframe.contentDocument || iframe.contentWindow.document;
-          contentEl = findEditable(contentSelectors, doc);
-          if (contentEl) { targetDoc = doc; break; }
-        } catch (e) {}
-      }
-    }
-
-    if (!contentEl) return { success: false, error: '에디터 본문 영역을 찾지 못했습니다.' };
-
-    // ── 3. 에디터 포커스 ────────────────────────────────
-    contentEl.click();
-    await sleep(400);
-    contentEl.focus();
-    await sleep(300);
-
-    // ── 4. 에디터 내부 전체 선택 (document 전체 아님) ──
-    selectAllIn(contentEl);
-    await sleep(100);
-
-    // ── 5. paste 이벤트로 HTML 삽입 ────────────────────
-    pasteHTML(contentEl, content, targetDoc);
     await sleep(500);
 
-    // ── 6. 삽입 확인 후 fallback ────────────────────────
-    const textLen = (contentEl.textContent || '').replace(/\s/g, '').length;
-    if (textLen < 5) {
-      // execCommand insertHTML 시도
-      selectAllIn(contentEl);
-      const ok = targetDoc.execCommand('insertHTML', false, content);
+    // ── 2. 본문 입력 ────────────────────────────────────
+    if (!bodyEntry) {
+      return { success: false, error: `본문 에디터 없음. 찾은 요소: ${editables.map(e => e.el.className.substring(0,40)).join(' | ')}` };
+    }
 
-      if (!ok || (contentEl.textContent || '').replace(/\s/g, '').length < 5) {
-        // 최후 수단: innerHTML 직접 교체
-        contentEl.innerHTML = content;
-        ['input', 'change'].forEach(evtName =>
-          contentEl.dispatchEvent(new Event(evtName, { bubbles: true }))
+    const { el: bodyEl, doc: bodyDoc } = bodyEntry;
+
+    bodyEl.click();
+    await sleep(300);
+    bodyEl.focus();
+    await sleep(300);
+
+    // 내부 전체 선택
+    selectAllIn(bodyEl);
+    await sleep(100);
+
+    // DataTransfer paste 시뮬레이션
+    const dt = new DataTransfer();
+    dt.setData('text/html', content);
+    dt.setData('text/plain', content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+    bodyEl.dispatchEvent(new ClipboardEvent('paste', {
+      clipboardData: dt,
+      bubbles: true,
+      cancelable: true,
+    }));
+
+    await sleep(600);
+
+    // paste 미처리 확인 → execCommand insertHTML fallback
+    const len = (bodyEl.textContent || '').replace(/\s/g, '').length;
+    if (len < 5) {
+      selectAllIn(bodyEl);
+      const ok = bodyDoc.execCommand('insertHTML', false, content);
+
+      // 그래도 실패 → innerHTML 직접 교체
+      if (!ok || (bodyEl.textContent || '').replace(/\s/g, '').length < 5) {
+        bodyEl.innerHTML = content;
+        ['input', 'change'].forEach(evt =>
+          bodyEl.dispatchEvent(new Event(evt, { bubbles: true }))
         );
       }
     }
 
-    return { success: true };
+    return {
+      success: true,
+      debug: {
+        totalEditables: editables.length,
+        titleClass: titleEntry.el.className.substring(0, 60),
+        bodyClass: bodyEntry.el.className.substring(0, 60),
+        bodyH: bodyEntry.el.offsetHeight,
+      }
+    };
   }
 
   return run();
