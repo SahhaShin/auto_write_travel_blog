@@ -223,6 +223,7 @@ public class NaverAutoPostServiceImpl implements NaverAutoPostService {
         String currentUrl = waitForLoginComplete(driver, draftId, 180);
 
         log.info("로그인 후 URL: {}", currentUrl);
+        log.info("로그인 후 페이지 타이틀: {}", driver.getTitle());
 
         // 2차 인증 화면 감지
         if (is2FAPage(driver, currentUrl)) {
@@ -261,7 +262,19 @@ public class NaverAutoPostServiceImpl implements NaverAutoPostService {
 
         // 최종 로그인 성공 여부 확인
         if (currentUrl.contains("nidlogin") || currentUrl.contains("ndoself") || is2FAPage(driver, currentUrl)) {
-            throw new RuntimeException("네이버 로그인 실패. 아이디/비밀번호를 확인하거나 OTP를 다시 시도해주세요.");
+            String pageTitle = driver.getTitle();
+            String pageSource = driver.getPageSource();
+            boolean hasCaptcha = pageSource.contains("captcha") || pageSource.contains("자동입력방지");
+            boolean hasError = pageSource.contains("아이디 또는 비밀번호") || pageSource.contains("로그인 정보가");
+            log.error("로그인 실패 - URL: {}, Title: {}, captcha: {}, pwError: {}", currentUrl, pageTitle, hasCaptcha, hasError);
+
+            if (hasCaptcha) {
+                throw new RuntimeException("네이버 캡차(자동입력방지) 감지. 헤드리스 서버에서는 처리 불가. 쿠키 세션이 없으면 직접 로그인 후 쿠키를 갱신해야 합니다.");
+            } else if (hasError) {
+                throw new RuntimeException("네이버 아이디 또는 비밀번호가 틀렸습니다. 설정에서 다시 확인해주세요.");
+            } else {
+                throw new RuntimeException("네이버 로그인 실패 (URL: " + currentUrl + "). 새 서버 IP로 인한 보안 차단이거나 캡차가 발생했을 수 있습니다.");
+            }
         }
     }
 
