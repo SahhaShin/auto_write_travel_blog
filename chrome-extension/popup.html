@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      width: 340px;
+      background: #f8f9fa;
+    }
+    .header {
+      background: #03c75a;
+      color: white;
+      padding: 14px 16px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .body { padding: 14px; }
+    .label {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 6px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      background: white;
+      margin-bottom: 12px;
+      appearance: auto;
+    }
+    .draft-info {
+      background: white;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .draft-info.visible { display: block; }
+    .draft-info .title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #222;
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .draft-info .meta {
+      font-size: 11px;
+      color: #888;
+      display: flex;
+      gap: 8px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+    .btn {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #03c75a; color: white; }
+    .btn-primary:hover:not(:disabled) { opacity: 0.85; }
+    .status {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      display: none;
+    }
+    .status.visible { display: block; }
+    .status.success { background: #e8f5e9; color: #2e7d32; }
+    .status.error { background: #ffebee; color: #c62828; }
+    .status.loading { background: #e3f2fd; color: #1565c0; }
+    .notice {
+      margin-top: 12px;
+      padding: 8px 10px;
+      background: #fff8e1;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #f57f17;
+      line-height: 1.6;
+    }
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="header">📝 네이버 블로그 초안 불러오기</div>
+  <div class="body">
+    <div class="label">초안 선택</div>
+    <select id="draftSelect">
+      <option value="">-- 초안을 선택하세요 --</option>
+    </select>
+
+    <div class="draft-info" id="draftInfo">
+      <div class="title" id="draftTitle"></div>
+      <div class="meta">
+        <span id="draftDest"></span>
+        <span id="draftDate"></span>
+        <span class="badge" id="draftStatus"></span>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="insertBtn" disabled>
+      초안 불러오기
+    </button>
+
+    <div class="status" id="status"></div>
+
+    <div class="notice">
+      ⚠️ 네이버 블로그 글쓰기 페이지에서만 동작합니다.<br>
+      내용 입력 후 발행은 직접 확인하고 눌러주세요.
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
