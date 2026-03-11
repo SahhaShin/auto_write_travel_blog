@@ -158,12 +158,15 @@ function insertDraftIntoEditor(title, content) {
     // 높이 기준 정렬 (큰 것 = 본문, 작은 것 = 제목)
     editables.sort((a, b) => b.el.offsetHeight - a.el.offsetHeight);
 
-    // 제목 요소: 'title' 클래스 포함이거나 가장 작은 것
+    // 제목 요소: se-title-text 클래스 또는 se-documentTitle 하위 요소 우선
     const titleEntry = editables.find(({ el }) =>
-      /title/i.test(el.className) || el.closest('[class*="title"]')
+      el.classList.contains('se-title-text') ||
+      el.closest('.se-documentTitle') !== null
+    ) || editables.find(({ el }) =>
+      /title/i.test(el.className)
     ) || editables[editables.length - 1];
 
-    // 본문 요소: 가장 큰 것 (단, 제목과 다른 것)
+    // 본문 요소: 제목이 아닌 것 중 가장 큰 것
     const bodyEntry = editables.find(({ el }) => el !== titleEntry.el) || editables[0];
 
     // ── 1. 제목 입력 ────────────────────────────────────
