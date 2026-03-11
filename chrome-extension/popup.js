@@ -168,13 +168,45 @@ function insertDraftIntoEditor(title, content) {
 
     // ── 1. 제목 입력 ────────────────────────────────────
     if (title && titleEntry) {
-      const { el: titleEl } = titleEntry;
+      const { el: titleEl, doc: titleDoc } = titleEntry;
+      titleEl.click();
+      await sleep(200);
       titleEl.focus();
       await sleep(200);
-      selectAllIn(titleEl);
+
+      // selectAllIn은 titleDoc 기준 range 사용
+      const range = titleDoc.createRange();
+      range.selectNodeContents(titleEl);
+      const sel = titleDoc.defaultView.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
       await sleep(100);
-      document.execCommand('insertText', false, title);
-      titleEl.dispatchEvent(new Event('input', { bubbles: true }));
+
+      // paste 방식으로 통일 (body와 동일)
+      const dt = new DataTransfer();
+      dt.setData('text/plain', title);
+      dt.setData('text/html', `<span>${title}</span>`);
+      const pasted = titleEl.dispatchEvent(new ClipboardEvent('paste', {
+        clipboardData: dt,
+        bubbles: true,
+        cancelable: true,
+      }));
+
+      await sleep(200);
+
+      // paste 미처리 → titleDoc.execCommand fallback
+      const titleText = (titleEl.textContent || '').replace(/\s/g, '');
+      if (titleText.length < 2) {
+        titleDoc.execCommand('insertText', false, title);
+        titleEl.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      // 그래도 안 되면 __se-node span 직접 수정
+      if ((titleEl.textContent || '').replace(/\s/g, '').length < 2) {
+        const span = titleEl.querySelector('.__se-node') || titleEl.querySelector('span') || titleEl;
+        span.textContent = title;
+        titleEl.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: title }));
+      }
     }
 
     await sleep(500);
