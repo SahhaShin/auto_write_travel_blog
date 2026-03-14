@@ -347,7 +347,7 @@ public class TravelServiceImpl {
             List<Map> responseParts = (List<Map>) content.get("parts");
             return (String) responseParts.get(0).get("text");
         } catch (Exception e) {
-            log.error("Gemini 멀티모달 API 호출 실패: {}", e.getMessage());
+            log.error("Gemini 멀티모달 API 호출 실패: {}", e.getMessage(), e);
             throw new RuntimeException("AI 이미지 분석에 실패했습니다: " + e.getMessage());
         }
     }
