@@ -85,7 +85,7 @@ function ItineraryTab({ trip, items, onChange }) {
   const [parseText, setParseText] = useState('');
   const [parseLoading, setParseLoading] = useState(false);
   const [highlightActivity, setHighlightActivity] = useState(null);
-  const [form, setForm] = useState({ dayNumber: 1, timeStart: '', timeEnd: '', activity: '', address: '', category: '활동', cost: '', memo: '' });
+  const [form, setForm] = useState({ dayNumber: 1, timeStart: '', timeEnd: '', activity: '', lat: '', lng: '', category: '활동', cost: '', memo: '' });
 
   const totalDays = trip.startDate && trip.endDate
     ? Math.ceil((new Date(trip.endDate) - new Date(trip.startDate)) / 86400000) + 1
@@ -94,7 +94,7 @@ function ItineraryTab({ trip, items, onChange }) {
 
   const handleSave = async () => {
     if (!form.activity.trim()) return alert('활동을 입력해주세요.');
-    const data = { ...form, cost: form.cost ? Number(form.cost) : 0 };
+    const data = { ...form, cost: form.cost ? Number(form.cost) : 0, lat: form.lat ? Number(form.lat) : null, lng: form.lng ? Number(form.lng) : null };
     if (editId) {
       await travelApi.updateItinerary(trip.id, editId, data);
       setEditId(null);
@@ -102,14 +102,14 @@ function ItineraryTab({ trip, items, onChange }) {
       await travelApi.addItinerary(trip.id, data);
       setAdding(false);
     }
-    setForm({ dayNumber: 1, timeStart: '', timeEnd: '', activity: '', address: '', category: '활동', cost: '', memo: '' });
+    setForm({ dayNumber: 1, timeStart: '', timeEnd: '', activity: '', lat: '', lng: '', category: '활동', cost: '', memo: '' });
     onChange();
   };
 
   const handleEdit = (item) => {
     setForm({
       dayNumber: item.dayNumber, timeStart: item.timeStart || '', timeEnd: item.timeEnd || '',
-      activity: item.activity, address: item.address || '', category: item.category || '활동',
+      activity: item.activity, lat: item.lat || '', lng: item.lng || '', category: item.category || '활동',
       cost: item.cost || '', memo: item.memo || '',
     });
     setEditId(item.id);
@@ -159,7 +159,9 @@ function ItineraryTab({ trip, items, onChange }) {
         <input style={{ ...s.inputSm, width: 160 }} placeholder="활동 입력" value={form.activity} onChange={e => setForm(p => ({ ...p, activity: e.target.value }))} />
       </td>
       <td style={s.td}>
-        <input style={{ ...s.inputSm, width: 180 }} placeholder="예) 충정로역 1번 출구" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} />
+        <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 3 }}>구글 지도 우클릭 → 좌표 복사</div>
+        <input style={{ ...s.inputSm, width: 90 }} placeholder="위도 37.123" value={form.lat} onChange={e => setForm(p => ({ ...p, lat: e.target.value }))} />
+        <input style={{ ...s.inputSm, width: 90, marginLeft: 4 }} placeholder="경도 127.123" value={form.lng} onChange={e => setForm(p => ({ ...p, lng: e.target.value }))} />
       </td>
       <td style={s.td}>
         <select style={s.inputSm} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
@@ -218,7 +220,6 @@ function ItineraryTab({ trip, items, onChange }) {
             <tr style={{ background: '#f9fafb' }}>
               <th style={s.th}>시간</th>
               <th style={s.th}>일정</th>
-              <th style={s.th}>📍 주소(지도용)</th>
               <th style={s.th}>카테고리</th>
               <th style={s.th}>비고</th>
               <th style={s.th}></th>
@@ -252,7 +253,8 @@ function ItineraryTab({ trip, items, onChange }) {
                         <input style={{ ...s.inputSm, width: 160 }} value={form.activity} onChange={e => setForm(p => ({ ...p, activity: e.target.value }))} />
                       </td>
                       <td style={s.td}>
-                        <input style={{ ...s.inputSm, width: 180 }} placeholder="예) 충정로역 1번 출구" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} />
+                        <input style={{ ...s.inputSm, width: 90 }} placeholder="위도" value={form.lat} onChange={e => setForm(p => ({ ...p, lat: e.target.value }))} />
+                        <input style={{ ...s.inputSm, width: 90, marginLeft: 4 }} placeholder="경도" value={form.lng} onChange={e => setForm(p => ({ ...p, lng: e.target.value }))} />
                       </td>
                       <td style={s.td}>
                         <select style={s.inputSm} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
@@ -278,9 +280,6 @@ function ItineraryTab({ trip, items, onChange }) {
                         title="지도에서 보기"
                       >
                         {item.activity}
-                      </td>
-                      <td style={{ ...s.td, fontSize: 12, color: '#6b7280' }}>
-                        {item.address || '-'}
                       </td>
                       <td style={s.td}>
                         <span style={{ ...s.catBadge, background: categoryColor[item.category] || '#6b7280' }}>

@@ -14,7 +14,9 @@ public class TravelItinerary {
     private String timeStart;
     private String timeEnd;
     private String activity;
-    private String address;    // 직접 입력한 주소 (지도 geocoding용)
+    private String address;    // 미사용 (하위 호환)
+    private Double lat;        // 위도 (구글 지도 좌표)
+    private Double lng;        // 경도 (구글 지도 좌표)
     private String category;   // 교통, 식사, 활동, 항공, 숙소, 기타
     private BigDecimal cost;   // 현지 통화
     private String memo;

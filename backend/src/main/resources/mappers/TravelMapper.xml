@@ -54,20 +54,20 @@
     ════════════════════════════════════════════════ -->
     <insert id="insertItinerary" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO travel_itinerary
-            (trip_id, day_number, date, time_start, time_end, activity, address,
+            (trip_id, day_number, date, time_start, time_end, activity, address, lat, lng,
              category, cost, memo, display_order)
         VALUES
-            (#{tripId}, #{dayNumber}, #{date}, #{timeStart}, #{timeEnd}, #{activity}, #{address},
+            (#{tripId}, #{dayNumber}, #{date}, #{timeStart}, #{timeEnd}, #{activity}, #{address}, #{lat}, #{lng},
              #{category}, #{cost}, #{memo}, #{displayOrder})
     </insert>
 
     <insert id="insertItineraryBatch">
         INSERT INTO travel_itinerary
-            (trip_id, day_number, date, time_start, time_end, activity, address,
+            (trip_id, day_number, date, time_start, time_end, activity, address, lat, lng,
              category, cost, memo, display_order)
         VALUES
         <foreach collection="list" item="i" separator=",">
-            (#{i.tripId}, #{i.dayNumber}, #{i.date}, #{i.timeStart}, #{i.timeEnd}, #{i.activity}, #{i.address},
+            (#{i.tripId}, #{i.dayNumber}, #{i.date}, #{i.timeStart}, #{i.timeEnd}, #{i.activity}, #{i.address}, #{i.lat}, #{i.lng},
              #{i.category}, #{i.cost}, #{i.memo}, #{i.displayOrder})
         </foreach>
     </insert>
@@ -86,7 +86,8 @@
             <if test="timeStart != null">time_start = #{timeStart},</if>
             <if test="timeEnd != null">time_end = #{timeEnd},</if>
             <if test="activity != null">activity = #{activity},</if>
-            address = #{address},
+            lat = #{lat},
+            lng = #{lng},
             <if test="category != null">category = #{category},</if>
             <if test="cost != null">cost = #{cost},</if>
             <if test="memo != null">memo = #{memo},</if>
