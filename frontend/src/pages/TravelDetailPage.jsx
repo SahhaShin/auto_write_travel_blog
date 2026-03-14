@@ -151,17 +151,16 @@ function ItineraryTab({ trip, items, onChange }) {
   const formRow = (
     <tr style={{ background: '#f0fdf4' }}>
       <td style={s.td}>
-        <select style={s.inputSm} value={form.dayNumber} onChange={e => setForm(p => ({ ...p, dayNumber: Number(e.target.value) }))}>
+        <select style={{ ...s.inputSm, marginBottom: 4 }} value={form.dayNumber} onChange={e => setForm(p => ({ ...p, dayNumber: Number(e.target.value) }))}>
           {days.map(d => <option key={d} value={d}>{d}일차</option>)}
         </select>
-      </td>
-      <td style={s.td}>
+        <br />
         <input style={s.inputSm} placeholder="09:00" value={form.timeStart} onChange={e => setForm(p => ({ ...p, timeStart: e.target.value }))} />
         <span style={{ margin: '0 2px', color: '#aaa' }}>~</span>
         <input style={s.inputSm} placeholder="10:00" value={form.timeEnd} onChange={e => setForm(p => ({ ...p, timeEnd: e.target.value }))} />
       </td>
       <td style={s.td}>
-        <input style={{ ...s.inputSm, width: 160 }} placeholder="활동 입력" value={form.activity} onChange={e => setForm(p => ({ ...p, activity: e.target.value }))} />
+        <input style={{ ...s.inputSm, width: '100%', boxSizing: 'border-box' }} placeholder="활동 입력" value={form.activity} onChange={e => setForm(p => ({ ...p, activity: e.target.value }))} />
       </td>
       <td style={s.td}>
         <select style={s.inputSm} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
@@ -169,7 +168,7 @@ function ItineraryTab({ trip, items, onChange }) {
         </select>
       </td>
       <td style={s.td}>
-        <input style={{ ...s.inputSm, width: 140 }} placeholder="메모" value={form.memo} onChange={e => setForm(p => ({ ...p, memo: e.target.value }))} />
+        <input style={{ ...s.inputSm, width: '100%', boxSizing: 'border-box' }} placeholder="메모" value={form.memo} onChange={e => setForm(p => ({ ...p, memo: e.target.value }))} />
       </td>
       <td style={s.td}>
         <button style={s.saveBtn} onClick={handleSave}>저장</button>
@@ -216,9 +215,15 @@ function ItineraryTab({ trip, items, onChange }) {
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={s.table}>
+          <colgroup>
+            <col style={{ width: 130 }} />
+            <col style={{ minWidth: 160 }} />
+            <col style={{ width: 70 }} />
+            <col />
+            <col style={{ width: 80 }} />
+          </colgroup>
           <thead>
             <tr style={{ background: '#f9fafb' }}>
-              <th style={s.th}>일차</th>
               <th style={s.th}>시간</th>
               <th style={s.th}>일정</th>
               <th style={s.th}>카테고리</th>
@@ -254,11 +259,10 @@ function ItineraryTab({ trip, items, onChange }) {
                         <input style={s.inputSm} placeholder="10:00" value={form.timeEnd} onChange={e => setForm(p => ({ ...p, timeEnd: e.target.value }))} />
                       </td>
                       <td style={s.td}>
-                        <input style={{ ...s.inputSm, width: 160 }} value={form.activity} onChange={e => setForm(p => ({ ...p, activity: e.target.value }))} />
-                      </td>
-                      <td style={s.td}>
-                        <input style={{ ...s.inputSm, width: 90 }} placeholder="위도" value={form.lat} onChange={e => setForm(p => ({ ...p, lat: e.target.value }))} />
-                        <input style={{ ...s.inputSm, width: 90, marginLeft: 4 }} placeholder="경도" value={form.lng} onChange={e => setForm(p => ({ ...p, lng: e.target.value }))} />
+                        <input style={{ ...s.inputSm, width: '100%', boxSizing: 'border-box', marginBottom: 4 }} value={form.activity} onChange={e => setForm(p => ({ ...p, activity: e.target.value }))} />
+                        <br />
+                        <input style={{ ...s.inputSm, width: 80 }} placeholder="위도" value={form.lat} onChange={e => setForm(p => ({ ...p, lat: e.target.value }))} />
+                        <input style={{ ...s.inputSm, width: 80, marginLeft: 4 }} placeholder="경도" value={form.lng} onChange={e => setForm(p => ({ ...p, lng: e.target.value }))} />
                       </td>
                       <td style={s.td}>
                         <select style={s.inputSm} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
@@ -266,7 +270,7 @@ function ItineraryTab({ trip, items, onChange }) {
                         </select>
                       </td>
                       <td style={s.td}>
-                        <input style={{ ...s.inputSm, width: 140 }} value={form.memo} onChange={e => setForm(p => ({ ...p, memo: e.target.value }))} />
+                        <input style={{ ...s.inputSm, width: '100%', boxSizing: 'border-box' }} value={form.memo} onChange={e => setForm(p => ({ ...p, memo: e.target.value }))} />
                       </td>
                       <td style={s.td}>
                         <button style={s.saveBtn} onClick={handleSave}>저장</button>
@@ -279,7 +283,7 @@ function ItineraryTab({ trip, items, onChange }) {
                         {item.timeStart && item.timeEnd ? `${item.timeStart}~${item.timeEnd}` : item.timeStart || '-'}
                       </td>
                       <td
-                        style={{ ...s.td, fontWeight: 500, cursor: 'pointer', color: '#2563eb' }}
+                        style={{ ...s.td, fontWeight: 500, cursor: 'pointer', color: '#2563eb', wordBreak: 'keep-all' }}
                         onClick={() => setHighlightActivity(item.activity)}
                         title="지도에서 보기"
                       >
