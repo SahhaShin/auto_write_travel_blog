@@ -161,8 +161,10 @@ function ItineraryTab({ trip, items, onChange }) {
         <input style={s.inputSm} placeholder="10:00" value={form.timeEnd} onChange={e => setForm(p => ({ ...p, timeEnd: e.target.value }))} />
       </td>
       <td style={s.td}>
-        <input style={{ ...s.inputSm, width: 200 }} placeholder="활동 입력" value={form.activity} onChange={e => setForm(p => ({ ...p, activity: e.target.value }))} />
-        <input style={{ ...s.inputSm, width: 200, marginTop: 4, display: 'block', color: '#6b7280' }} placeholder="📍 주소 (지도용, 선택)" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} />
+        <input style={{ ...s.inputSm, width: 160 }} placeholder="활동 입력" value={form.activity} onChange={e => setForm(p => ({ ...p, activity: e.target.value }))} />
+      </td>
+      <td style={s.td}>
+        <input style={{ ...s.inputSm, width: 180 }} placeholder="예) 충정로역 1번 출구" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} />
       </td>
       <td style={s.td}>
         <select style={s.inputSm} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
@@ -225,6 +227,7 @@ function ItineraryTab({ trip, items, onChange }) {
               <th style={s.th}>일차</th>
               <th style={s.th}>시간</th>
               <th style={s.th}>일정</th>
+              <th style={s.th}>📍 주소(지도용)</th>
               <th style={s.th}>카테고리</th>
               <th style={s.th}>경비({trip.currency || '현지'})</th>
               <th style={s.th}>비고</th>
@@ -242,7 +245,7 @@ function ItineraryTab({ trip, items, onChange }) {
               if (dayItems.length === 0 && !adding) return null;
               return [
                 <tr key={`day-${day}`}>
-                  <td colSpan={7} style={s.dayHeader}>
+                  <td colSpan={8} style={s.dayHeader}>
                     <span style={s.dayBadge}>{day}일차</span>
                     {dateStr && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>{dateStr}</span>}
                   </td>
@@ -261,8 +264,10 @@ function ItineraryTab({ trip, items, onChange }) {
                         <input style={s.inputSm} placeholder="10:00" value={form.timeEnd} onChange={e => setForm(p => ({ ...p, timeEnd: e.target.value }))} />
                       </td>
                       <td style={s.td}>
-                        <input style={{ ...s.inputSm, width: 200 }} value={form.activity} onChange={e => setForm(p => ({ ...p, activity: e.target.value }))} />
-                        <input style={{ ...s.inputSm, width: 200, marginTop: 4, display: 'block', color: '#6b7280' }} placeholder="📍 주소 (지도용, 선택)" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} />
+                        <input style={{ ...s.inputSm, width: 160 }} value={form.activity} onChange={e => setForm(p => ({ ...p, activity: e.target.value }))} />
+                      </td>
+                      <td style={s.td}>
+                        <input style={{ ...s.inputSm, width: 180 }} placeholder="예) 충정로역 1번 출구" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} />
                       </td>
                       <td style={s.td}>
                         <select style={s.inputSm} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
@@ -292,11 +297,9 @@ function ItineraryTab({ trip, items, onChange }) {
                         title="지도에서 보기"
                       >
                         {item.activity}
-                        {item.address && (
-                          <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 400, marginTop: 2 }}>
-                            📍 {item.address}
-                          </div>
-                        )}
+                      </td>
+                      <td style={{ ...s.td, fontSize: 12, color: '#6b7280' }}>
+                        {item.address || '-'}
                       </td>
                       <td style={s.td}>
                         <span style={{ ...s.catBadge, background: categoryColor[item.category] || '#6b7280' }}>
