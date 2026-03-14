@@ -429,6 +429,32 @@ ALTER TABLE travel_itinerary ADD COLUMN address VARCHAR(500);
 
 ---
 
+---
+
+## 2026-03-14 | PR #8~10 — 일정 테이블 UI 개선 + 지도 z-index 수정 + 위경도 입력
+
+### PR #8 — 일정 테이블 일차 컬럼 제거
+- 일차 헤더가 행 그룹으로 이미 표시되므로 테이블 내 일차 컬럼 제거 (colSpan 8→7)
+
+### PR #9 — 지도 z-index + 경비 컬럼 제거
+- `TravelMap`: 컨테이너에 `isolation: isolate` 추가 → Leaflet 내부 z-index(200~700)가 지도 안에 격리되어 sticky 헤더(z-index:100) 위로 올라오는 문제 해결
+- 일정 테이블에서 경비 컬럼 제거 (경비 탭이 별도로 존재)
+
+### PR #10 — 위도/경도 직접 입력으로 마커 정확도 개선
+- `TravelItinerary.java`: `lat`, `lng` (Double) 필드 추가
+- `TravelMapper.xml`: INSERT/UPDATE에 lat/lng 포함
+- `TravelDetailPage`: 주소 입력 → 위도/경도 입력으로 교체 (추가/수정 폼에만 표시, 목록에는 미표시)
+  - 힌트: "구글 지도 우클릭 → 좌표 복사"
+- `TravelMap`: lat/lng 있으면 Nominatim geocoding 없이 바로 마커 표시
+
+**DB 마이그레이션 (미완료 시 TiDB 콘솔에서 실행)**
+```sql
+ALTER TABLE travel_itinerary ADD COLUMN lat DOUBLE;
+ALTER TABLE travel_itinerary ADD COLUMN lng DOUBLE;
+```
+
+---
+
 ## 현재 상태 (2026-03-14 기준)
 
 | 기능 | 상태 |
