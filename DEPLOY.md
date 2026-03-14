@@ -230,7 +230,7 @@ CREATE TABLE travel_itinerary (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 여행 체크리스트 (사전준비 / 서류 / 짐 싸기 공용)
+-- 여행 체크리스트
 CREATE TABLE travel_checklist (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   trip_id BIGINT NOT NULL,
@@ -315,6 +315,8 @@ repo root/
 - **Render 무료 플랜**: 15분 비활성 시 슬립 → 첫 요청 50초+ 지연
 - **render.yaml vs 대시보드**: 기존 서비스는 대시보드 설정 우선
 - **schema.sql 자동 실행 안됨**: DB 스키마 변경 시 TiDB 콘솔에서 수동 실행
-- **CORS**: SecurityConfig에 `.cors(Customizer.withDefaults())` 필수 — 없으면 `/api/auth/**` 포함 모든 CORS 요청 403
-- **Cloudinary 미설정 시**: 이미지가 로컬 uploads에 저장 → Render 재배포 시 삭제됨
 - **JWT_SECRET 미설정 시**: 기본값(dev용)으로 동작하나 보안상 반드시 운영 키 설정
+- **Cloudinary 미설정 시**: 이미지가 로컬 uploads에 저장 → Render 재배포 시 삭제됨
+- **CORS**: SecurityConfig에 `AntPathRequestMatcher` 사용 — Spring Security 6 `MvcRequestMatcher` 경로 매칭 이슈 우회
+- **이미지 base64 전송**: `server.tomcat.max-http-form-post-size=-1` 설정으로 대용량 JSON body 허용
+- **Gemini 멀티모달**: `maxOutputTokens=65536`, `temperature=0.3` 으로 긴 일정도 잘림 없이 생성

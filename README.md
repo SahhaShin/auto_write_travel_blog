@@ -30,8 +30,10 @@
 2. **스타일 학습** - 기존 네이버 블로그 URL 또는 텍스트를 등록하면 AI가 문체 분석
 3. **여행 플래너** - 여행 계획 전체 주기 관리
    - AI 자동 생성 (Gemini 2.5-flash): 여행지/기간/스타일 입력 → 일정+체크리스트+짐목록+현지정보 자동 생성
-   - 기존 계획 완성: 부분적으로 짠 계획을 붙여넣으면 AI가 빈 부분 채워줌
-   - 6개 탭 관리: 사전 준비(보드) / 여행 일정 / 서류 준비 / 짐 싸기 / 경비(현지+원화) / 각종 정보
+   - 기존 계획 완성: 텍스트 또는 **사진(손글씨·캡처 이미지)** 업로드 → Gemini 멀티모달로 읽어서 일정 완성
+   - **AI 자연어 일정 추가**: 카카오톡 내용을 그대로 붙여넣기 → AI가 일정 항목으로 자동 파싱
+   - **구글 지도**: 여행 일정 탭 상단에 여행지 중심 지도 표시
+   - 6개 탭 관리: 사전 준비(보드) / 여행 일정 / 서류 준비 / 짐 싸기 / 경비(현지+원화, 날짜순 정렬) / 각종 정보
 4. **AI 글 생성** - 이미지 + 여행 계획 입력 → Claude API가 동일 문체로 한국어 초안 생성
    - 여행 플래너 연동 시: 실제 일정·경비·현지 정보가 프롬프트에 자동 반영되어 더 풍부한 글 생성
    - Claude 크레딧 소진 시 **Gemini 2.5-flash 자동 fallback**
@@ -69,8 +71,8 @@ auto-blog/
 │   │   │   ├── StyleReferencePage.jsx
 │   │   │   ├── HistoryPage.jsx
 │   │   │   ├── TravelListPage.jsx   # 여행 목록
-│   │   │   ├── TravelCreatePage.jsx # 새 여행 생성 (AI 자동 / 계획 완성)
-│   │   │   └── TravelDetailPage.jsx # 여행 상세 (6탭)
+│   │   │   ├── TravelCreatePage.jsx # 새 여행 생성 (AI 자동 / 계획 완성 + 사진 업로드)
+│   │   │   └── TravelDetailPage.jsx # 여행 상세 (6탭 + 구글 지도 + AI 자연어 입력)
 │   │   ├── App.jsx
 │   │   └── App.css
 │   ├── vercel.json
@@ -79,8 +81,8 @@ auto-blog/
 ├── backend/                     # Spring Boot 3.x
 │   ├── src/main/java/com/shincha/naverblog/
 │   │   ├── config/
-│   │   │   ├── SecurityConfig.java  # Spring Security + CORS(withDefaults) + BCrypt
-│   │   │   └── WebConfig.java       # CORS allowedOriginPatterns 설정
+│   │   │   ├── SecurityConfig.java  # Spring Security + AntPathRequestMatcher + BCrypt
+│   │   │   └── WebConfig.java       # CORS allowedOriginPatterns + RestTemplate @Bean
 │   │   ├── security/
 │   │   │   └── JwtFilter.java
 │   │   ├── util/
@@ -100,23 +102,23 @@ auto-blog/
 │   │       │   ├── BlogStyleSample.java
 │   │       │   ├── BlogImage.java
 │   │       │   ├── PostHistory.java
-│   │       │   ├── TravelTrip.java      # 여행 기본 정보
-│   │       │   ├── TravelItinerary.java # 날짜별 일정
-│   │       │   ├── TravelChecklist.java # 사전준비/서류/짐 체크리스트
-│   │       │   └── TravelExpense.java   # 경비 내역
+│   │       │   ├── TravelTrip.java
+│   │       │   ├── TravelItinerary.java
+│   │       │   ├── TravelChecklist.java
+│   │       │   └── TravelExpense.java
 │   │       ├── dao/
 │   │       │   ├── UserDao.java
 │   │       │   ├── DraftDao.java
 │   │       │   ├── StyleDao.java
 │   │       │   ├── ImageDao.java
 │   │       │   ├── PostHistoryDao.java
-│   │       │   └── TravelDao.java       # 여행 플래너 통합 DAO
+│   │       │   └── TravelDao.java
 │   │       └── service/
 │   │           ├── ClaudeServiceImpl.java  # 여행 계획 데이터 프롬프트 반영
 │   │           ├── StyleServiceImpl.java
 │   │           ├── DraftServiceImpl.java
 │   │           ├── ImageServiceImpl.java
-│   │           └── TravelServiceImpl.java  # AI 여행 계획 생성 (Gemini)
+│   │           └── TravelServiceImpl.java  # AI 여행 계획 생성/파싱 (Gemini)
 │   └── src/main/resources/
 │       ├── application.properties
 │       └── mappers/
@@ -125,10 +127,11 @@ auto-blog/
 │           ├── StyleMapper.xml
 │           ├── ImageMapper.xml
 │           ├── PostHistoryMapper.xml
-│           └── TravelMapper.xml         # 여행 플래너 통합 매퍼
+│           └── TravelMapper.xml
 │
 ├── Dockerfile                   # Render 배포용
 ├── render.yaml
+├── DEV_RULES.md                 # 개발 규칙 (브랜치/PR/리뷰/MD 업데이트)
 └── README.md
 ```
 
@@ -141,15 +144,17 @@ auto-blog/
 ```
 1. 여행 플래너 → 새 여행 계획
          ↓
-2. AI로 일정 자동 생성 OR 기존 계획 붙여넣기 완성
+2. AI로 일정 자동 생성 OR 기존 계획 텍스트/사진 붙여넣기 완성
          ↓
-3. 6개 탭에서 일정·경비·서류·짐·현지정보 관리
+3. AI 자연어 일정 추가 (카카오톡 내용 → 자동 파싱)
          ↓
-4. 새 글 작성 → "여행 계획 연결" 드롭다운에서 해당 여행 선택
+4. 6개 탭에서 일정·경비·서류·짐·현지정보 관리
          ↓
-5. AI 글 생성 → 실제 일정/경비/현지정보가 프롬프트에 자동 반영
+5. 새 글 작성 → "여행 계획 연결" 드롭다운에서 해당 여행 선택
          ↓
-6. 에디터에서 수정 → 크롬 익스텐션으로 네이버 블로그에 삽입
+6. AI 글 생성 → 실제 일정/경비/현지정보가 프롬프트에 자동 반영
+         ↓
+7. 에디터에서 수정 → 크롬 익스텐션으로 네이버 블로그에 삽입
 ```
 
 ### 단독 블로그 글쓰기 흐름
@@ -213,7 +218,8 @@ auto-blog/
 | DELETE | `/api/travel/{tripId}` | 삭제 |
 | POST | `/api/travel/{tripId}/generate` | AI로 전체 계획 생성 (Gemini) |
 | POST | `/api/travel/{tripId}/fill-gaps` | AI로 빈 시간대 채우기 |
-| POST | `/api/travel/{tripId}/complete` | 기존 계획 기반 AI 완성 |
+| POST | `/api/travel/{tripId}/complete` | 텍스트+이미지 기반 AI 계획 완성 (Gemini 멀티모달) |
+| POST | `/api/travel/{tripId}/parse-text` | 자연어 텍스트 → 일정 자동 파싱 |
 | POST | `/api/travel/{tripId}/itinerary` | 일정 추가 |
 | PUT | `/api/travel/{tripId}/itinerary/{id}` | 일정 수정 |
 | DELETE | `/api/travel/{tripId}/itinerary/{id}` | 일정 삭제 |
@@ -260,7 +266,8 @@ auto-blog/
 - **Render 무료 플랜**: 15분 비활성 시 슬립 → 첫 요청 30~60초 대기
 - **Cloudinary**: 이미지 영구 저장용. 미설정 시 Render 재배포 때 이미지 삭제됨
 - **JWT_SECRET**: 운영 환경에서 반드시 32자 이상 강력한 문자열 설정
-- **CORS**: SecurityConfig에 `.cors(Customizer.withDefaults())` 적용으로 Vercel ↔ Render CORS 정상 동작
+- **CORS**: SecurityConfig에서 `AntPathRequestMatcher` 사용 (Spring Security 6 MvcRequestMatcher 이슈 우회)
+- **이미지 업로드 (기존 계획 완성)**: 프론트에서 Canvas로 최대 1024px 압축 후 base64 전송
 
 ---
 

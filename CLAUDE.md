@@ -7,7 +7,7 @@
 기존 네이버 블로그 글의 문체를 AI가 학습하여, 이미지와 여행 계획 입력만으로 동일 스타일의 블로그 초안을 자동 생성하는 풀스택 웹앱.
 생성된 초안은 크롬 익스텐션으로 네이버 블로그 글쓰기 페이지에 삽입. 제목은 사용자가 직접 입력 후 발행.
 다중 사용자 지원: 회원가입/로그인 후 각자의 데이터만 접근 가능.
-여행 플래너: AI(Gemini 2.5-flash)로 여행 계획 자동 생성 및 관리. 확정된 계획을 블로그 글쓰기에 자동 연동.
+여행 플래너: AI(Gemini 2.5-flash)로 여행 계획 자동 생성 및 관리. 사진/텍스트로 기존 계획 완성. 카카오톡 자연어 → 일정 자동 파싱. 확정된 계획을 블로그 글쓰기에 자동 연동.
 
 ---
 
@@ -42,8 +42,8 @@ auto-blog/
 │   └── src/main/
 │       ├── java/com/shincha/naverblog/
 │       │   ├── config/
-│       │   │   ├── SecurityConfig.java   # Spring Security + cors(Customizer.withDefaults()) + BCrypt
-│       │   │   └── WebConfig.java        # CORS allowedOriginPatterns
+│       │   │   ├── SecurityConfig.java   # Spring Security + AntPathRequestMatcher + BCrypt
+│       │   │   └── WebConfig.java        # CORS allowedOriginPatterns + RestTemplate @Bean + CorsConfigurationSource @Bean
 │       │   ├── security/
 │       │   │   └── JwtFilter.java
 │       │   ├── util/
@@ -87,7 +87,7 @@ auto-blog/
     │       ├── HistoryPage.jsx
     │       ├── TravelListPage.jsx          # 여행 목록
     │       ├── TravelCreatePage.jsx        # 새 여행 생성 (AI / 계획 완성)
-    │       └── TravelDetailPage.jsx        # 6탭 상세 관리
+    │       └── TravelDetailPage.jsx        # 6탭 + 구글 지도 embed + AI 자연어 일정 입력
     ├── vercel.json
     └── package.json
 ```
@@ -201,6 +201,10 @@ vercel --prod --yes
 - **Cloudinary**: 이미지 영구 저장. 미설정 시 로컬 uploads에 저장 (Render 재배포 시 삭제됨)
 - **크롬 익스텐션**: 제목은 SmartEditor ONE API 접근 불가로 사용자가 직접 입력. 본문만 자동 삽입
 - **데이터 격리**: 모든 조회/생성 API는 JWT의 userId 기반으로 자신의 데이터만 접근 가능
-- **CORS**: SecurityConfig에 반드시 `.cors(Customizer.withDefaults())` 추가. 없으면 `/api/auth/**` 포함 모든 CORS 요청 403 오류
+- **CORS**: SecurityConfig에 `AntPathRequestMatcher` 사용 필수 — Spring Security 6 `MvcRequestMatcher` 경로 매칭 이슈로 `permitAll()` 미동작 가능
 - **여행 플래너 AI**: Gemini 2.5-flash 사용 (무료). `GEMINI_API_KEY` 환경변수 필수
 - **여행 계획 연동**: `blog_drafts.trip_id` → `TravelDao`로 일정/경비/정보 조회 → 프롬프트 자동 삽입
+- **이미지 base64 전송**: `server.tomcat.max-http-form-post-size=-1` 필수. 프론트에서 Canvas 압축(최대 1024px, JPEG 0.8) 후 전송
+- **Gemini 멀티모달**: `maxOutputTokens=65536`, `temperature=0.3` — 긴 일정 잘림 방지
+- **경비 정렬**: `COALESCE(expense_date, '9999-12-31') ASC` — NULL 날짜 항목 맨 뒤 처리
+- **AI 자연어 파싱**: `/api/travel/{tripId}/parse-text` — 자유 텍스트 → Gemini → itinerary 항목 자동 저장
