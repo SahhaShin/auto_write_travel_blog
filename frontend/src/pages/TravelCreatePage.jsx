@@ -27,6 +27,7 @@ export default function TravelCreatePage() {
   const [loading, setLoading] = useState(false);
   const [selectedStyles, setSelectedStyles] = useState([]);
   const [existingPlan, setExistingPlan] = useState('');
+  const [planImages, setPlanImages] = useState([]); // { preview, data, mimeType }
   const [form, setForm] = useState({
     title: '',
     destination: '',
@@ -37,6 +38,26 @@ export default function TravelCreatePage() {
     currency: 'USD',
     exchangeRate: '',
   });
+
+  const handleImageSelect = (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        // "data:image/jpeg;base64," 부분 분리
+        const [header, data] = dataUrl.split(',');
+        const mimeType = header.match(/:(.*?);/)[1];
+        setPlanImages(prev => [...prev, { preview: dataUrl, data, mimeType }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const removePlanImage = (idx) => {
+    setPlanImages(prev => prev.filter((_, i) => i !== idx));
+  };
 
   const toggleStyle = (s) => {
     setSelectedStyles(prev =>
@@ -72,8 +93,9 @@ export default function TravelCreatePage() {
 
       if (mode === 'auto') {
         await travelApi.generatePlan(trip.id);
-      } else if (mode === 'complete' && existingPlan.trim()) {
-        await travelApi.completePlan(trip.id, existingPlan);
+      } else if (mode === 'complete' && (existingPlan.trim() || planImages.length > 0)) {
+        const images = planImages.map(({ data, mimeType }) => ({ data, mimeType }));
+        await travelApi.completePlan(trip.id, existingPlan, images.length > 0 ? images : undefined);
       }
 
       navigate(`/travel/${trip.id}`);
@@ -211,15 +233,56 @@ export default function TravelCreatePage() {
           </div>
 
           {mode === 'complete' && (
-            <div style={styles.field}>
-              <label style={styles.label}>기존 계획 붙여넣기</label>
-              <textarea
-                style={{ ...styles.input, height: 180, resize: 'vertical' }}
-                value={existingPlan}
-                onChange={e => setExistingPlan(e.target.value)}
-                placeholder="현재 갖고 있는 여행 계획을 자유롭게 입력해주세요. AI가 빈 부분을 채워드립니다."
-              />
-            </div>
+            <>
+              <div style={styles.field}>
+                <label style={styles.label}>계획 사진 업로드 (선택)</label>
+                <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+                  손으로 쓴 계획, 캡처 이미지 등을 올리면 AI가 읽어서 반영합니다.
+                </p>
+                <label style={styles.imgUploadBtn}>
+                  사진 선택
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={handleImageSelect}
+                  />
+                </label>
+                {planImages.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+                    {planImages.map((img, idx) => (
+                      <div key={idx} style={{ position: 'relative' }}>
+                        <img
+                          src={img.preview}
+                          alt=""
+                          style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removePlanImage(idx)}
+                          style={{
+                            position: 'absolute', top: -6, right: -6,
+                            width: 20, height: 20, borderRadius: '50%',
+                            background: '#ef4444', color: '#fff', border: 'none',
+                            cursor: 'pointer', fontSize: 11, lineHeight: '20px', textAlign: 'center',
+                          }}
+                        >×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={styles.field}>
+                <label style={styles.label}>기존 계획 텍스트 (선택)</label>
+                <textarea
+                  style={{ ...styles.input, height: 140, resize: 'vertical' }}
+                  value={existingPlan}
+                  onChange={e => setExistingPlan(e.target.value)}
+                  placeholder="텍스트로 된 계획도 함께 입력하면 AI가 합쳐서 완성해줍니다."
+                />
+              </div>
+            </>
           )}
 
           <button type="submit" style={styles.submitBtn} disabled={loading}>
@@ -261,5 +324,10 @@ const styles = {
     width: '100%', marginTop: 24, padding: '14px 0',
     background: '#2ecc71', color: '#fff', border: 'none', borderRadius: 8,
     fontSize: 15, fontWeight: 700, cursor: 'pointer',
+  },
+  imgUploadBtn: {
+    display: 'inline-block', padding: '8px 16px',
+    border: '1px solid #d1d5db', borderRadius: 8,
+    background: '#f9fafb', cursor: 'pointer', fontSize: 13, color: '#374151',
   },
 };

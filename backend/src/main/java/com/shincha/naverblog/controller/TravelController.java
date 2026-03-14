@@ -96,10 +96,12 @@ public class TravelController {
 
     @PostMapping("/{tripId}/complete")
     public ResponseEntity<?> completePlan(@PathVariable Long tripId,
-                                           @RequestBody Map<String, String> body) {
+                                           @RequestBody Map<String, Object> body) {
         try {
-            String existingPlan = body.get("existingPlan");
-            return ResponseEntity.ok(travelService.completePlan(tripId, existingPlan, getUserId()));
+            String existingPlan = (String) body.get("existingPlan");
+            @SuppressWarnings("unchecked")
+            List<Map<String, String>> images = (List<Map<String, String>>) body.get("images");
+            return ResponseEntity.ok(travelService.completePlan(tripId, existingPlan, images, getUserId()));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }

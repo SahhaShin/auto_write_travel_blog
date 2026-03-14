@@ -148,7 +148,8 @@ public class TravelServiceImpl {
         return parseAndSaveNewItems(tripId, jsonResponse);
     }
 
-    public Map<String, Object> completePlan(Long tripId, String existingPlanText, Long userId) {
+    public Map<String, Object> completePlan(Long tripId, String existingPlanText,
+                                             List<Map<String, String>> images, Long userId) {
         TravelTrip trip = travelDao.findTripById(tripId, userId);
         if (trip == null) throw new RuntimeException("여행을 찾을 수 없습니다.");
 
@@ -156,7 +157,9 @@ public class TravelServiceImpl {
         int days = nights + 1;
 
         String prompt = buildCompletePlanPrompt(trip, existingPlanText, days);
-        String jsonResponse = callGemini(prompt);
+        String jsonResponse = (images != null && !images.isEmpty())
+                ? callGeminiMultimodal(prompt, images)
+                : callGemini(prompt);
 
         return parseAndSaveGeneratedPlan(trip, jsonResponse);
     }
@@ -311,6 +314,41 @@ public class TravelServiceImpl {
         } catch (Exception e) {
             log.error("Gemini API 호출 실패: {}", e.getMessage());
             throw new RuntimeException("AI 여행 계획 생성에 실패했습니다: " + e.getMessage());
+        }
+    }
+
+    private String callGeminiMultimodal(String prompt, List<Map<String, String>> images) {
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/"
+                + geminiModel + ":generateContent?key=" + geminiApiKey;
+
+        List<Map<String, Object>> parts = new ArrayList<>();
+        for (Map<String, String> img : images) {
+            parts.add(Map.of("inlineData", Map.of(
+                    "mimeType", img.getOrDefault("mimeType", "image/jpeg"),
+                    "data", img.get("data")
+            )));
+        }
+        parts.add(Map.of("text", prompt));
+
+        Map<String, Object> body = Map.of(
+                "contents", List.of(Map.of("role", "user", "parts", parts)),
+                "generationConfig", Map.of("temperature", 0.7, "maxOutputTokens", 8192)
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        try {
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
+            Map<String, Object> resp = response.getBody();
+            List<Map> candidates = (List<Map>) resp.get("candidates");
+            Map content = (Map) candidates.get(0).get("content");
+            List<Map> responseParts = (List<Map>) content.get("parts");
+            return (String) responseParts.get(0).get("text");
+        } catch (Exception e) {
+            log.error("Gemini 멀티모달 API 호출 실패: {}", e.getMessage());
+            throw new RuntimeException("AI 이미지 분석에 실패했습니다: " + e.getMessage());
         }
     }
 
