@@ -159,11 +159,6 @@ function ItineraryTab({ trip, items, onChange }) {
         <input style={{ ...s.inputSm, width: 160 }} placeholder="활동 입력" value={form.activity} onChange={e => setForm(p => ({ ...p, activity: e.target.value }))} />
       </td>
       <td style={s.td}>
-        <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 3 }}>구글 지도 우클릭 → 좌표 복사</div>
-        <input style={{ ...s.inputSm, width: 90 }} placeholder="위도 37.123" value={form.lat} onChange={e => setForm(p => ({ ...p, lat: e.target.value }))} />
-        <input style={{ ...s.inputSm, width: 90, marginLeft: 4 }} placeholder="경도 127.123" value={form.lng} onChange={e => setForm(p => ({ ...p, lng: e.target.value }))} />
-      </td>
-      <td style={s.td}>
         <select style={s.inputSm} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
           {CATEGORIES_ITINERARY.map(c => <option key={c}>{c}</option>)}
         </select>
