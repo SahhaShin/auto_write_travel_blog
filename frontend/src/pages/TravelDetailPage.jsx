@@ -151,11 +151,6 @@ function ItineraryTab({ trip, items, onChange }) {
   const formRow = (
     <tr style={{ background: '#f0fdf4' }}>
       <td style={s.td}>
-        <select style={s.inputSm} value={form.dayNumber} onChange={e => setForm(p => ({ ...p, dayNumber: Number(e.target.value) }))}>
-          {days.map(d => <option key={d} value={d}>{d}일차</option>)}
-        </select>
-      </td>
-      <td style={s.td}>
         <input style={s.inputSm} placeholder="09:00" value={form.timeStart} onChange={e => setForm(p => ({ ...p, timeStart: e.target.value }))} />
         <span style={{ margin: '0 2px', color: '#aaa' }}>~</span>
         <input style={s.inputSm} placeholder="10:00" value={form.timeEnd} onChange={e => setForm(p => ({ ...p, timeEnd: e.target.value }))} />
@@ -224,7 +219,6 @@ function ItineraryTab({ trip, items, onChange }) {
         <table style={s.table}>
           <thead>
             <tr style={{ background: '#f9fafb' }}>
-              <th style={s.th}>일차</th>
               <th style={s.th}>시간</th>
               <th style={s.th}>일정</th>
               <th style={s.th}>📍 주소(지도용)</th>
@@ -245,7 +239,7 @@ function ItineraryTab({ trip, items, onChange }) {
               if (dayItems.length === 0 && !adding) return null;
               return [
                 <tr key={`day-${day}`}>
-                  <td colSpan={8} style={s.dayHeader}>
+                  <td colSpan={7} style={s.dayHeader}>
                     <span style={s.dayBadge}>{day}일차</span>
                     {dateStr && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>{dateStr}</span>}
                   </td>
@@ -253,11 +247,6 @@ function ItineraryTab({ trip, items, onChange }) {
                 ...dayItems.map(item =>
                   editId === item.id ? (
                     <tr key={item.id} style={{ background: '#f0fdf4' }}>
-                      <td style={s.td}>
-                        <select style={s.inputSm} value={form.dayNumber} onChange={e => setForm(p => ({ ...p, dayNumber: Number(e.target.value) }))}>
-                          {days.map(d => <option key={d} value={d}>{d}일차</option>)}
-                        </select>
-                      </td>
                       <td style={s.td}>
                         <input style={s.inputSm} placeholder="09:00" value={form.timeStart} onChange={e => setForm(p => ({ ...p, timeStart: e.target.value }))} />
                         <span style={{ margin: '0 2px', color: '#aaa' }}>~</span>
@@ -287,7 +276,6 @@ function ItineraryTab({ trip, items, onChange }) {
                     </tr>
                   ) : (
                     <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ ...s.td, color: '#9ca3af', fontSize: 12 }}>{item.dayNumber}일차</td>
                       <td style={{ ...s.td, fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>
                         {item.timeStart && item.timeEnd ? `${item.timeStart}~${item.timeEnd}` : item.timeStart || '-'}
                       </td>
