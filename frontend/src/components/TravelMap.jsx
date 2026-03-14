@@ -19,17 +19,6 @@ const makeIcon = (color, day) => L.divIcon({
   popupAnchor: [0, -16],
 });
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-async function geocode(query) {
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&accept-language=ko`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'travel-planner-auto-blog' } });
-    const data = await res.json();
-    if (data.length > 0) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-    return null;
-  } catch { return null; }
-}
 
 function FitBounds({ markers }) {
   const map = useMap();
@@ -62,85 +51,30 @@ function MapController({ highlightActivity, markers, markerRefs }) {
 export default function TravelMap({ trip, items, highlightActivity }) {
   const [center, setCenter] = useState(null);
   const [markers, setMarkers] = useState([]);
-  const [loadingText, setLoadingText] = useState('지도 로딩 중...');
-  const cancelRef = useRef(false);
   const markerRefs = useRef({});
 
   useEffect(() => {
-    cancelRef.current = false;
-    setMarkers([]);
-    setCenter(null);
-    setLoadingText('위치 검색 중...');
-
-    async function load() {
-      // 1. 여행지 중심 좌표
-      const destCoord = await geocode(trip.destination);
-      if (cancelRef.current) return;
-      if (destCoord) setCenter(destCoord);
-
-      // 2. 의미있는 활동만 geocode (교통·항공 제외)
-      const filtered = items.filter(i =>
-        !['교통', '항공'].includes(i.category) && i.activity?.trim().length > 1
-      );
-      const seen = new Set();
-      const unique = filtered.filter(i => {
-        const k = i.activity.trim();
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      }).slice(0, 15);
-
-      setLoadingText(`마커 추가 중 (0 / ${unique.length})`);
-
-      let done = 0;
-      for (const item of unique) {
-        if (cancelRef.current) return;
-
-        let coord = null;
-        if (item.lat && item.lng) {
-          // 위도/경도 직접 입력된 경우 바로 사용 (geocoding 불필요)
-          coord = [Number(item.lat), Number(item.lng)];
-        } else {
-          // 없으면 활동명+여행지로 Nominatim geocoding 시도
-          coord = await geocode(`${item.activity}, ${trip.destination}`);
-          await sleep(1100);
-        }
-
-        done++;
-        setLoadingText(`마커 추가 중 (${done} / ${unique.length})`);
-        if (coord && !cancelRef.current) {
-          setCenter(prev => prev || coord);
-          setMarkers(prev => [...prev, {
-            lat: coord[0], lng: coord[1],
-            activity: item.activity,
-            dayNumber: item.dayNumber,
-            timeStart: item.timeStart,
-            timeEnd: item.timeEnd,
-            category: item.category || '기타',
-          }]);
-        }
-      }
-      if (!cancelRef.current) setLoadingText('');
-    }
-
-    load();
-    return () => { cancelRef.current = true; };
-  }, [trip.id, items.map(i => i.id).join(',')]);
+    // 위경도가 입력된 활동만 마커로 표시
+    const newMarkers = items
+      .filter(i => i.lat && i.lng)
+      .map(item => ({
+        lat: Number(item.lat), lng: Number(item.lng),
+        activity: item.activity,
+        dayNumber: item.dayNumber,
+        timeStart: item.timeStart,
+        timeEnd: item.timeEnd,
+        category: item.category || '기타',
+      }));
+    setMarkers(newMarkers);
+    setCenter(newMarkers.length > 0 ? [newMarkers[0].lat, newMarkers[0].lng] : null);
+  }, [trip.id, items.map(i => `${i.id}:${i.lat}:${i.lng}`).join(',')]);
 
   return (
     <div style={{ borderRadius: 10, overflow: 'hidden', marginBottom: 20, border: '1px solid #e5e7eb', position: 'relative', isolation: 'isolate' }}>
       {/* leaflet-div-icon 기본 흰 배경·테두리 제거 */}
       <style>{`.leaflet-div-icon { background: transparent !important; border: none !important; }`}</style>
 
-      {loadingText && (
-        <div style={{
-          position: 'absolute', top: 10, right: 10, zIndex: 1000,
-          background: 'rgba(255,255,255,0.92)', padding: '4px 12px',
-          borderRadius: 20, fontSize: 12, color: '#6b7280', boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-        }}>
-          📍 {loadingText}
-        </div>
-      )}
+
       {center ? (
         <MapContainer center={center} zoom={13} style={{ height: 320, width: '100%' }}>
           <TileLayer
@@ -174,7 +108,7 @@ export default function TravelMap({ trip, items, highlightActivity }) {
         </MapContainer>
       ) : (
         <div style={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9fafb', color: '#9ca3af', fontSize: 14 }}>
-          {loadingText || '위치를 찾을 수 없습니다.'}
+          일정에 위도/경도를 입력하면 지도에 표시됩니다.
         </div>
       )}
       {markers.length > 0 && (
