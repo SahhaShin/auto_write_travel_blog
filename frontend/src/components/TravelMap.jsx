@@ -95,7 +95,9 @@ export default function TravelMap({ trip, items, highlightActivity }) {
       let done = 0;
       for (const item of unique) {
         if (cancelRef.current) return;
-        const coord = await geocode(`${item.activity}, ${trip.destination}`);
+        // 주소 직접 입력된 경우 주소로 geocoding, 없으면 활동명+여행지로 시도
+        const query = item.address?.trim() || `${item.activity}, ${trip.destination}`;
+        const coord = await geocode(query);
         done++;
         setLoadingText(`마커 추가 중 (${done} / ${unique.length})`);
         if (coord && !cancelRef.current) {
