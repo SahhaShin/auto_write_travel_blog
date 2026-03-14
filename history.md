@@ -401,6 +401,24 @@ ALTER TABLE users ADD COLUMN google_id VARCHAR(100);
 
 ---
 
+---
+
+## 2026-03-14 | PR #6 — 일정 주소 입력 + 지도 정확도 개선
+
+### 변경 내용
+
+- `TravelItinerary.java`: `address` 필드 추가
+- `TravelMapper.xml`: INSERT/UPDATE에 address 컬럼 포함
+- `TravelDetailPage.jsx`: 일정 추가/수정 폼에 `📍 주소 (지도용, 선택)` 입력 칸 추가 (활동명 아래). 목록에서 주소 입력된 항목은 활동명 하단에 주소 표시
+- `TravelMap.jsx`: geocoding 시 주소 우선 사용 → 없으면 활동명+여행지로 fallback
+
+**DB 마이그레이션**
+```sql
+ALTER TABLE travel_itinerary ADD COLUMN address VARCHAR(500);
+```
+
+---
+
 ## 현재 상태 (2026-03-14 기준)
 
 | 기능 | 상태 |
