@@ -137,6 +137,71 @@ public class TravelServiceImpl {
         return parseAndSaveGeneratedPlan(trip, jsonResponse);
     }
 
+    public List<TravelItinerary> parseTextToItinerary(Long tripId, String text, Long userId) {
+        TravelTrip trip = travelDao.findTripById(tripId, userId);
+        if (trip == null) throw new RuntimeException("여행을 찾을 수 없습니다.");
+
+        int nights = calculateNights(trip.getStartDate(), trip.getEndDate());
+        int days = nights + 1;
+
+        String prompt = String.format("""
+            당신은 여행 일정 파싱 전문가입니다.
+            아래 텍스트에서 여행 일정 항목들을 추출하여 JSON 배열로 반환해주세요.
+            여행지: %s, 총 %d일 여행입니다.
+
+            입력 텍스트:
+            %s
+
+            ⚠️ 반드시 아래 JSON 형식만 출력하세요. 마크다운 없이 순수 JSON만 출력:
+            {"items":[{"dayNumber":1,"timeStart":"10:00","timeEnd":"12:00","activity":"활동명","category":"교통|식사|활동|항공|숙소|쇼핑|기타","cost":0,"memo":"메모"}]}
+
+            규칙:
+            - 텍스트에 날짜/시간이 없으면 합리적으로 추측
+            - dayNumber는 1부터 시작 (총 %d일 이내)
+            - activity는 반드시 한국어로
+            - 일정 항목이 없으면 {"items":[]} 반환
+            """, trip.getDestination(), days, text, days);
+
+        String jsonResponse = callGemini(prompt);
+
+        try {
+            String cleanJson = extractJson(jsonResponse);
+            // {"items":[...]} 형태에서 items 배열 추출
+            if (!cleanJson.contains("\"items\"")) {
+                // 혹시 배열로 바로 반환된 경우
+                cleanJson = "{\"items\":" + cleanJson + "}";
+            }
+            JsonNode root = objectMapper.readTree(cleanJson);
+            JsonNode itemsNode = root.get("items");
+
+            List<TravelItinerary> newItems = new ArrayList<>();
+            if (itemsNode != null && itemsNode.isArray()) {
+                int order = (int)(System.currentTimeMillis() % 100000);
+                for (JsonNode node : itemsNode) {
+                    TravelItinerary item = new TravelItinerary();
+                    item.setTripId(tripId);
+                    item.setDayNumber(node.has("dayNumber") ? node.get("dayNumber").asInt() : 1);
+                    item.setTimeStart(node.has("timeStart") ? node.get("timeStart").asText(null) : null);
+                    item.setTimeEnd(node.has("timeEnd") ? node.get("timeEnd").asText(null) : null);
+                    item.setActivity(node.has("activity") ? node.get("activity").asText() : "");
+                    item.setCategory(node.has("category") ? node.get("category").asText("기타") : "기타");
+                    item.setCost(node.has("cost") ? new BigDecimal(node.get("cost").asText("0")) : BigDecimal.ZERO);
+                    item.setMemo(node.has("memo") ? node.get("memo").asText(null) : null);
+                    item.setDisplayOrder(order++);
+                    if (trip.getStartDate() != null) {
+                        item.setDate(trip.getStartDate().plusDays(item.getDayNumber() - 1));
+                    }
+                    newItems.add(item);
+                }
+                if (!newItems.isEmpty()) travelDao.insertItineraryBatch(newItems);
+            }
+            return newItems;
+        } catch (Exception e) {
+            log.error("텍스트 파싱 실패: {}", e.getMessage(), e);
+            throw new RuntimeException("AI 텍스트 파싱 실패: " + e.getMessage());
+        }
+    }
+
     public List<TravelItinerary> fillGaps(Long tripId, Long userId) {
         TravelTrip trip = travelDao.findTripById(tripId, userId);
         if (trip == null) throw new RuntimeException("여행을 찾을 수 없습니다.");

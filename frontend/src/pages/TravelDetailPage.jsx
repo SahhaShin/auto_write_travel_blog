@@ -81,6 +81,8 @@ function ItineraryTab({ trip, items, onChange }) {
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [parseText, setParseText] = useState('');
+  const [parseLoading, setParseLoading] = useState(false);
   const [form, setForm] = useState({ dayNumber: 1, timeStart: '', timeEnd: '', activity: '', category: '활동', cost: '', memo: '' });
 
   const totalDays = trip.startDate && trip.endDate
@@ -129,6 +131,21 @@ function ItineraryTab({ trip, items, onChange }) {
     }
   };
 
+  const handleParseText = async () => {
+    if (!parseText.trim()) return;
+    setParseLoading(true);
+    try {
+      const result = await travelApi.parseText(trip.id, parseText);
+      setParseText('');
+      onChange();
+      alert(`✅ ${result.length}개 일정이 추가됐습니다!`);
+    } catch (e) {
+      alert(e.response?.data?.error || 'AI 분석 실패');
+    } finally {
+      setParseLoading(false);
+    }
+  };
+
   const formRow = (
     <tr style={{ background: '#f0fdf4' }}>
       <td style={s.td}>
@@ -162,8 +179,48 @@ function ItineraryTab({ trip, items, onChange }) {
     </tr>
   );
 
+  const mapQuery = encodeURIComponent(trip.destination || '');
+
   return (
     <div>
+      {/* 구글 지도 */}
+      <div style={{ borderRadius: 10, overflow: 'hidden', marginBottom: 20, border: '1px solid #e5e7eb' }}>
+        <iframe
+          title="map"
+          src={`https://maps.google.com/maps?q=${mapQuery}&output=embed&hl=ko`}
+          width="100%"
+          height="260"
+          style={{ border: 'none', display: 'block' }}
+          loading="lazy"
+          allowFullScreen
+        />
+      </div>
+
+      {/* AI 자연어 일정 추가 */}
+      <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#7c3aed', marginBottom: 8 }}>
+          ✨ AI 일정 자동 추가 — 카카오톡 내용 그대로 붙여넣기
+        </div>
+        <p style={{ fontSize: 12, color: '#9ca3af', margin: '0 0 10px' }}>
+          예) "소살리토 자전거 타고 싶어", "2일차에 피어39 가자", "밥은 부당베이커리 ㄱ"
+        </p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <textarea
+            style={{ ...s.input, flex: 1, height: 72, resize: 'none' }}
+            value={parseText}
+            onChange={e => setParseText(e.target.value)}
+            placeholder="친구들 카톡 내용이나 가고 싶은 곳을 자유롭게 입력하세요. AI가 일정으로 변환해줍니다."
+          />
+          <button
+            style={{ ...s.aiBtn, background: '#7c3aed', alignSelf: 'flex-end', padding: '10px 18px' }}
+            onClick={handleParseText}
+            disabled={parseLoading}
+          >
+            {parseLoading ? '분석 중...' : 'AI 추가'}
+          </button>
+        </div>
+      </div>
+
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, justifyContent: 'flex-end' }}>
         <button style={s.aiBtn} onClick={handleFillGaps} disabled={aiLoading}>
           {aiLoading ? '분석 중...' : '✨ AI 빈 시간 채우기'}
