@@ -11,6 +11,7 @@ const travelApi = {
   // AI 생성
   generatePlan: (tripId) => axiosClient.post(`/api/travel/${tripId}/generate`).then(r => r.data),
   fillGaps: (tripId) => axiosClient.post(`/api/travel/${tripId}/fill-gaps`).then(r => r.data),
+  parseText: (tripId, text) => axiosClient.post(`/api/travel/${tripId}/parse-text`, { text }).then(r => r.data),
   completePlan: (tripId, existingPlan, images) =>
     axiosClient.post(`/api/travel/${tripId}/complete`, { existingPlan, images }).then(r => r.data),
 

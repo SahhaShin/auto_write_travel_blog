@@ -85,6 +85,18 @@ public class TravelController {
         }
     }
 
+    @PostMapping("/{tripId}/parse-text")
+    public ResponseEntity<?> parseText(@PathVariable Long tripId,
+                                        @RequestBody Map<String, String> body) {
+        try {
+            String text = body.get("text");
+            if (text == null || text.isBlank()) return ResponseEntity.badRequest().body(Map.of("error", "텍스트를 입력해주세요."));
+            return ResponseEntity.ok(travelService.parseTextToItinerary(tripId, text, getUserId()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PostMapping("/{tripId}/fill-gaps")
     public ResponseEntity<?> fillGaps(@PathVariable Long tripId) {
         try {
