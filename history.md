@@ -342,11 +342,54 @@ ALTER TABLE blog_drafts ADD COLUMN trip_id BIGINT;
 
 ---
 
+---
+
+## 2026-03-14 | PR #4 — Leaflet 지도 마커 + Google Sign-In
+
+### 1. 여행 일정 지도 마커 (Leaflet + Nominatim)
+
+**신규 파일**
+- `frontend/src/components/TravelMap.jsx`: Leaflet 지도 컴포넌트
+  - Nominatim(OpenStreetMap) 지오코딩으로 여행지 중심 좌표 및 최대 15개 장소 마커 추가
+  - 카테고리별 색상 원형 마커 (식사·활동·쇼핑·숙소·기타), 마커 안에 일차 숫자 표시
+  - 마커 클릭 시 팝업 (장소명, 일차, 시작~종료 시간)
+  - 1.1초 요청 딜레이 (Nominatim 무료 rate limit 준수)
+  - `FitBounds` 컴포넌트로 마커 전체가 보이도록 자동 줌
+  - 하단 카테고리 범례 및 총 장소 수 표시
+  - 교통·항공 카테고리 제외, 중복 장소명 필터링
+
+**변경된 파일**
+- `TravelDetailPage.jsx`: Google Maps iframe 제거 → `<TravelMap>` 컴포넌트로 교체
+
+### 2. Google Sign-In 연동
+
+**Backend**
+- `User.java`: `googleId` 필드 추가
+- `UserDao.java`: `findByGoogleId()`, `updateGoogleId()` 메서드 추가
+- `UserMapper.xml`: google_id 컬럼 resultMap, SELECT, UPDATE, INSERT 반영
+- `AuthController.java`: `POST /api/auth/google` 엔드포인트 추가
+  - Google tokeninfo API로 idToken 검증
+  - 기존 Google 연동 계정 조회 → 없으면 이메일로 기존 계정 조회 후 연동 → 없으면 신규 가입
+  - JWT 반환
+- `application.properties`: `GOOGLE_CLIENT_ID` 환경변수 추가
+
+**Frontend**
+- `LoginPage.jsx`, `RegisterPage.jsx`: Google Sign-In 버튼 추가 (`@react-oauth/google`)
+- `App.jsx`: `GoogleOAuthProvider`로 전체 앱 래핑
+
+**DB 마이그레이션**
+```sql
+ALTER TABLE users ADD COLUMN google_id VARCHAR(100);
+```
+
+---
+
 ## 현재 상태 (2026-03-14 기준)
 
 | 기능 | 상태 |
 |------|------|
 | 회원가입 / 로그인 (JWT) | 완료 |
+| Google Sign-In 연동 | 완료 (환경변수 설정 필요) |
 | 사용자별 데이터 격리 | 완료 |
 | 스타일 참고 URL 분석 | 완료 |
 | AI 글 생성 (Claude → Gemini fallback) | 완료 |
@@ -356,6 +399,8 @@ ALTER TABLE blog_drafts ADD COLUMN trip_id BIGINT;
 | Selenium 자동 발행 | 제거 (크롬 익스텐션으로 대체) |
 | CORS 403 버그 수정 | 완료 |
 | 여행 플래너 (AI 계획 생성 + 6탭 관리) | 완료 |
+| AI 자연어 일정 파싱 | 완료 |
+| Leaflet 지도 마커 (전체 일정 장소) | 완료 |
 | 여행 플래너 ↔ 블로그 글쓰기 연동 | 완료 |
 | 프로덕션 배포 (Vercel + Render + TiDB) | 완료 |
 

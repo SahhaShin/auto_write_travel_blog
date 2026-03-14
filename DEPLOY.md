@@ -86,6 +86,9 @@ vercel --prod --yes
 ```bash
 vercel env add VITE_API_BASE_URL production
 # 값: https://naver-blog-backend.onrender.com
+
+vercel env add VITE_GOOGLE_CLIENT_ID production
+# 값: Google Cloud Console에서 발급받은 OAuth 클라이언트 ID
 ```
 
 ### Backend → Render
@@ -113,6 +116,7 @@ git push origin main
 | `CLOUDINARY_CLOUD_NAME` | Cloudinary 클라우드명 |
 | `CLOUDINARY_API_KEY` | Cloudinary API 키 |
 | `CLOUDINARY_API_SECRET` | Cloudinary API 시크릿 |
+| `GOOGLE_CLIENT_ID` | Google OAuth 클라이언트 ID (Google Sign-In용) |
 
 **Render 설정 (대시보드 확인):**
 - Root Directory: 비워두기
@@ -284,6 +288,12 @@ CREATE TABLE users (
 ALTER TABLE blog_drafts ADD COLUMN trip_id BIGINT;
 
 -- 여행 플래너 테이블 4개 생성 (위 전체 스키마의 travel_* 테이블 참고)
+```
+
+### Google Sign-In 추가 (v4)
+
+```sql
+ALTER TABLE users ADD COLUMN google_id VARCHAR(100);
 ```
 
 ---

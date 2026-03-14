@@ -15,7 +15,7 @@
 | Backend | Spring Boot 3.2 (Java 17) + Spring Security + MyBatis |
 | Database | TiDB Cloud Serverless (MySQL 8 호환) |
 | AI | Claude API (claude-sonnet-4-6) + Gemini 2.5-flash (fallback / 여행 계획 생성) |
-| 인증 | JWT (JJWT 0.12.5) + BCrypt |
+| 인증 | JWT (JJWT 0.12.5) + BCrypt + Google OAuth 2.0 |
 | 에디터 | TipTap (ProseMirror 기반) |
 | 이미지 저장 | Cloudinary |
 | 배포 | Frontend → Vercel / Backend → Render (Docker) |
@@ -26,13 +26,13 @@
 
 ## 주요 기능
 
-1. **회원가입 / 로그인** - JWT 기반 다중 사용자 인증. 사용자별 데이터 완전 분리
+1. **회원가입 / 로그인** - JWT 기반 다중 사용자 인증. 사용자별 데이터 완전 분리. **Google 계정으로 로그인** 지원
 2. **스타일 학습** - 기존 네이버 블로그 URL 또는 텍스트를 등록하면 AI가 문체 분석
 3. **여행 플래너** - 여행 계획 전체 주기 관리
    - AI 자동 생성 (Gemini 2.5-flash): 여행지/기간/스타일 입력 → 일정+체크리스트+짐목록+현지정보 자동 생성
    - 기존 계획 완성: 텍스트 또는 **사진(손글씨·캡처 이미지)** 업로드 → Gemini 멀티모달로 읽어서 일정 완성
    - **AI 자연어 일정 추가**: 카카오톡 내용을 그대로 붙여넣기 → AI가 일정 항목으로 자동 파싱
-   - **구글 지도**: 여행 일정 탭 상단에 여행지 중심 지도 표시
+   - **Leaflet 지도 마커**: 여행 일정 탭 상단에 Leaflet 지도 표시. Nominatim 지오코딩으로 모든 일정 장소를 카테고리별 색상 마커로 표시 (일차 번호, 팝업 정보 포함)
    - 6개 탭 관리: 사전 준비(보드) / 여행 일정 / 서류 준비 / 짐 싸기 / 경비(현지+원화, 날짜순 정렬) / 각종 정보
 4. **AI 글 생성** - 이미지 + 여행 계획 입력 → Claude API가 동일 문체로 한국어 초안 생성
    - 여행 플래너 연동 시: 실제 일정·경비·현지 정보가 프롬프트에 자동 반영되어 더 풍부한 글 생성
@@ -63,9 +63,11 @@ auto-blog/
 │   │   │   ├── generateApi.js
 │   │   │   ├── postApi.js
 │   │   │   └── travelApi.js     # 여행 플래너 API
+│   │   ├── components/
+│   │   │   └── TravelMap.jsx        # Leaflet 지도 (Nominatim 지오코딩, 카테고리 마커)
 │   │   ├── pages/
-│   │   │   ├── LoginPage.jsx
-│   │   │   ├── RegisterPage.jsx
+│   │   │   ├── LoginPage.jsx        # Google Sign-In 버튼 포함
+│   │   │   ├── RegisterPage.jsx     # Google Sign-In 버튼 포함
 │   │   │   ├── CreatePostPage.jsx   # 여행 계획 연결 + 이미지 업로드
 │   │   │   ├── EditorPage.jsx
 │   │   │   ├── StyleReferencePage.jsx
@@ -175,6 +177,7 @@ auto-blog/
 |--------|----------|------|
 | POST | `/api/auth/register` | 회원가입 → JWT 반환 |
 | POST | `/api/auth/login` | 로그인 → JWT 반환 |
+| POST | `/api/auth/google` | Google idToken 검증 → 계정 생성/연동 → JWT 반환 |
 
 > 이하 모든 API는 `Authorization: Bearer <token>` 헤더 필요
 

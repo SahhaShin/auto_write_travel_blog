@@ -19,7 +19,7 @@
 | Backend | Spring Boot 3.2 (Java 17) + Spring Security + MyBatis |
 | Database | TiDB Cloud Serverless (MySQL 8 호환) |
 | AI | Claude API (`claude-sonnet-4-6`) + Gemini 2.5-flash (fallback) |
-| 인증 | JWT (JJWT 0.12.5) + BCrypt |
+| 인증 | JWT (JJWT 0.12.5) + BCrypt + Google OAuth 2.0 (`@react-oauth/google`) |
 | 이미지 저장 | Cloudinary (Render ephemeral fs 대체) |
 | 에디터 | TipTap (ProseMirror 기반) |
 | 크롬 익스텐션 | Manifest V3, MAIN world scripting |
