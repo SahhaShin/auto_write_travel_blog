@@ -8,6 +8,7 @@
         <id property="id" column="id"/>
         <result property="username" column="username"/>
         <result property="passwordHash" column="password_hash"/>
+        <result property="googleId" column="google_id"/>
         <result property="createdAt" column="created_at"/>
     </resultMap>
 
@@ -15,8 +16,17 @@
         SELECT * FROM users WHERE username = #{username}
     </select>
 
+    <select id="findByGoogleId" parameterType="string" resultMap="UserResultMap">
+        SELECT * FROM users WHERE google_id = #{googleId}
+    </select>
+
     <insert id="insert" parameterType="User" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO users (username, password_hash) VALUES (#{username}, #{passwordHash})
+        INSERT INTO users (username, password_hash, google_id)
+        VALUES (#{username}, #{passwordHash}, #{googleId})
     </insert>
+
+    <update id="updateGoogleId">
+        UPDATE users SET google_id = #{googleId} WHERE id = #{id}
+    </update>
 
 </mapper>
