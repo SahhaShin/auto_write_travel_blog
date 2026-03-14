@@ -172,9 +172,6 @@ function ItineraryTab({ trip, items, onChange }) {
         </select>
       </td>
       <td style={s.td}>
-        <input style={s.inputSm} type="number" placeholder="0" value={form.cost} onChange={e => setForm(p => ({ ...p, cost: e.target.value }))} />
-      </td>
-      <td style={s.td}>
         <input style={{ ...s.inputSm, width: 140 }} placeholder="메모" value={form.memo} onChange={e => setForm(p => ({ ...p, memo: e.target.value }))} />
       </td>
       <td style={s.td}>
@@ -229,7 +226,6 @@ function ItineraryTab({ trip, items, onChange }) {
               <th style={s.th}>일정</th>
               <th style={s.th}>📍 주소(지도용)</th>
               <th style={s.th}>카테고리</th>
-              <th style={s.th}>경비({trip.currency || '현지'})</th>
               <th style={s.th}>비고</th>
               <th style={s.th}></th>
             </tr>
@@ -245,7 +241,7 @@ function ItineraryTab({ trip, items, onChange }) {
               if (dayItems.length === 0 && !adding) return null;
               return [
                 <tr key={`day-${day}`}>
-                  <td colSpan={8} style={s.dayHeader}>
+                  <td colSpan={7} style={s.dayHeader}>
                     <span style={s.dayBadge}>{day}일차</span>
                     {dateStr && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>{dateStr}</span>}
                   </td>
@@ -275,9 +271,6 @@ function ItineraryTab({ trip, items, onChange }) {
                         </select>
                       </td>
                       <td style={s.td}>
-                        <input style={s.inputSm} type="number" value={form.cost} onChange={e => setForm(p => ({ ...p, cost: e.target.value }))} />
-                      </td>
-                      <td style={s.td}>
                         <input style={{ ...s.inputSm, width: 140 }} value={form.memo} onChange={e => setForm(p => ({ ...p, memo: e.target.value }))} />
                       </td>
                       <td style={s.td}>
@@ -305,9 +298,6 @@ function ItineraryTab({ trip, items, onChange }) {
                         <span style={{ ...s.catBadge, background: categoryColor[item.category] || '#6b7280' }}>
                           {item.category}
                         </span>
-                      </td>
-                      <td style={{ ...s.td, fontSize: 13 }}>
-                        {item.cost > 0 ? `${Number(item.cost).toLocaleString()}` : '-'}
                       </td>
                       <td style={{ ...s.td, fontSize: 12, color: '#6b7280' }}>{item.memo || '-'}</td>
                       <td style={s.td}>

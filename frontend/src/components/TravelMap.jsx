@@ -122,7 +122,7 @@ export default function TravelMap({ trip, items, highlightActivity }) {
   }, [trip.id, items.map(i => i.id).join(',')]);
 
   return (
-    <div style={{ borderRadius: 10, overflow: 'hidden', marginBottom: 20, border: '1px solid #e5e7eb', position: 'relative' }}>
+    <div style={{ borderRadius: 10, overflow: 'hidden', marginBottom: 20, border: '1px solid #e5e7eb', position: 'relative', isolation: 'isolate' }}>
       {/* leaflet-div-icon 기본 흰 배경·테두리 제거 */}
       <style>{`.leaflet-div-icon { background: transparent !important; border: none !important; }`}</style>
 
