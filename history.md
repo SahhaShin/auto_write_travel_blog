@@ -384,6 +384,23 @@ ALTER TABLE users ADD COLUMN google_id VARCHAR(100);
 
 ---
 
+---
+
+## 2026-03-14 | PR #5 — 지도 마커 표시 버그 수정 + 일정명 클릭 지도 이동
+
+### 수정 내용
+
+**마커 안 보이는 버그 수정 (2가지)**
+- 목적지 geocoding 실패 시 `center`가 null로 남아 지도 자체가 렌더링 안 되던 문제 → 첫 번째 마커 geocoding 성공 시 해당 좌표를 fallback center로 사용
+- `leaflet-div-icon` 기본 흰 배경·테두리가 색상 마커 위에 겹치던 문제 → CSS `transparent` 주입으로 해결
+
+**일정명 클릭 → 지도 마커 이동 신규 기능**
+- 일정 테이블의 활동명을 파란 클릭 가능 텍스트로 변경
+- 클릭 시 `MapController`가 `map.flyTo()` 호출 → 해당 마커로 부드럽게 이동 + 팝업 자동 오픈
+- `markerRefs` ref map으로 Leaflet 마커 인스턴스를 activity명으로 관리
+
+---
+
 ## 현재 상태 (2026-03-14 기준)
 
 | 기능 | 상태 |
