@@ -156,8 +156,11 @@ public class TravelServiceImpl {
         int nights = calculateNights(trip.getStartDate(), trip.getEndDate());
         int days = nights + 1;
 
-        String prompt = buildCompletePlanPrompt(trip, existingPlanText, days);
-        String jsonResponse = (images != null && !images.isEmpty())
+        boolean hasImages = images != null && !images.isEmpty();
+        String prompt = hasImages
+                ? buildCompletePlanPromptWithImages(trip, existingPlanText, days)
+                : buildCompletePlanPrompt(trip, existingPlanText, days);
+        String jsonResponse = hasImages
                 ? callGeminiMultimodal(prompt, images)
                 : callGemini(prompt);
 
@@ -254,6 +257,30 @@ public class TravelServiceImpl {
         );
     }
 
+    private String buildCompletePlanPromptWithImages(TravelTrip trip, String existingPlan, int days) {
+        String extra = (existingPlan != null && !existingPlan.isBlank())
+                ? "\n추가 텍스트 메모:\n" + existingPlan : "";
+        return String.format("""
+            당신은 전문 여행 플래너입니다.
+            첨부된 이미지(여행 계획 스크린샷 또는 메모)를 읽고, 아래 여행 정보와 합쳐서 완성된 여행 계획을 만들어 주세요.%s
+
+            여행 정보:
+            - 여행지: %s
+            - 기간: %d일
+            - 여행 스타일: %s
+
+            ⚠️ 반드시 아래 JSON 형식만 출력하세요. JSON 외 텍스트, 마크다운 코드블록 없이 순수 JSON만 출력하세요.
+            각 일정 항목은 반드시 "dayNumber"(정수), "timeStart"("HH:mm"), "timeEnd"("HH:mm"), "activity"(한국어 문자열), "category"("교통"|"식사"|"활동"|"항공"|"숙소"|"쇼핑"|"기타"), "cost"(숫자), "memo"(문자열) 필드를 포함해야 합니다.
+
+            출력 형식 (이 구조 그대로):
+            {"itinerary":[{"dayNumber":1,"timeStart":"15:22","timeEnd":"16:30","activity":"샌프란시스코 공항 도착 및 호텔 이동","category":"교통","cost":70000,"memo":"우버 또는 공항픽업 이용"},{"dayNumber":1,"timeStart":"17:00","timeEnd":"17:30","activity":"호텔 체크인 및 짐 정리","category":"숙소","cost":0,"memo":""}],"checklist":{"prePrepItems":["비자 신청","항공권 예매","숙소 예약","여행자 보험","환전","유심 구매"],"documentsItems":["여권","항공권 E-ticket","숙소 바우처","여행자보험증명서"],"packingItems":["여권","여권지갑","보조배터리","멀티어댑터","상비약","선크림"]},"info":[{"title":"입국 정보","content":"미국 ESTA 필요, 캐나다 경유 시 캐나다 eTA도 필요"},{"title":"교통","content":"BART, 뮤니패스, 우버/웨이모 활용"},{"title":"환율","content":"1USD ≈ 1,350원 (2025년 기준)"}]}
+            """,
+                extra,
+                trip.getDestination(), days,
+                trip.getTravelStyle() != null ? trip.getTravelStyle() : "일반"
+        );
+    }
+
     private String buildCompletePlanPrompt(TravelTrip trip, String existingPlan, int days) {
         return String.format("""
             당신은 전문 여행 플래너입니다. 아래 기존 여행 계획을 기반으로 완성된 여행 계획을 JSON으로 생성해주세요.
@@ -332,7 +359,7 @@ public class TravelServiceImpl {
 
         Map<String, Object> body = Map.of(
                 "contents", List.of(Map.of("role", "user", "parts", parts)),
-                "generationConfig", Map.of("temperature", 0.7, "maxOutputTokens", 8192)
+                "generationConfig", Map.of("temperature", 0.3, "maxOutputTokens", 65536)
         );
 
         HttpHeaders headers = new HttpHeaders();
