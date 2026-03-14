@@ -229,7 +229,6 @@ function ItineraryTab({ trip, items, onChange }) {
               <th style={s.th}>일차</th>
               <th style={s.th}>시간</th>
               <th style={s.th}>일정</th>
-              <th style={s.th}>📍 위도 / 경도</th>
               <th style={s.th}>카테고리</th>
               <th style={s.th}>경비({trip.currency || '현지'})</th>
               <th style={s.th}>비고</th>
@@ -247,7 +246,7 @@ function ItineraryTab({ trip, items, onChange }) {
               if (dayItems.length === 0 && !adding) return null;
               return [
                 <tr key={`day-${day}`}>
-                  <td colSpan={8} style={s.dayHeader}>
+                  <td colSpan={7} style={s.dayHeader}>
                     <span style={s.dayBadge}>{day}일차</span>
                     {dateStr && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>{dateStr}</span>}
                   </td>
@@ -300,9 +299,6 @@ function ItineraryTab({ trip, items, onChange }) {
                         title="지도에서 보기"
                       >
                         {item.activity}
-                      </td>
-                      <td style={{ ...s.td, fontSize: 11, color: '#6b7280' }}>
-                        {item.lat && item.lng ? `${item.lat}, ${item.lng}` : '-'}
                       </td>
                       <td style={s.td}>
                         <span style={{ ...s.catBadge, background: categoryColor[item.category] || '#6b7280' }}>
