@@ -23,6 +23,7 @@
         <result property="createdAt" column="created_at"/>
         <result property="userId" column="user_id"/>
         <result property="updatedAt" column="updated_at"/>
+        <result property="tripId" column="trip_id"/>
     </resultMap>
 
     <select id="findAllByUserId" resultMap="DraftResultMap">
@@ -34,8 +35,8 @@
     </select>
 
     <insert id="insert" parameterType="BlogDraft" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO blog_drafts (user_id, destination, travel_dates, itinerary, key_points, category)
-        VALUES (#{userId}, #{destination}, #{travelDates}, #{itinerary}, #{keyPoints}, #{category})
+        INSERT INTO blog_drafts (user_id, destination, travel_dates, itinerary, key_points, category, trip_id)
+        VALUES (#{userId}, #{destination}, #{travelDates}, #{itinerary}, #{keyPoints}, #{category}, #{tripId})
     </insert>
 
     <update id="update" parameterType="BlogDraft">

@@ -5,9 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shincha.naverblog.model.dao.DraftDao;
 import com.shincha.naverblog.model.dao.ImageDao;
 import com.shincha.naverblog.model.dao.StyleDao;
+import com.shincha.naverblog.model.dao.TravelDao;
 import com.shincha.naverblog.model.dto.BlogDraft;
 import com.shincha.naverblog.model.dto.BlogImage;
 import com.shincha.naverblog.model.dto.BlogStyleSample;
+import com.shincha.naverblog.model.dto.TravelChecklist;
+import com.shincha.naverblog.model.dto.TravelExpense;
+import com.shincha.naverblog.model.dto.TravelItinerary;
+import com.shincha.naverblog.model.dto.TravelTrip;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +34,7 @@ public class ClaudeServiceImpl implements ClaudeService {
     private final DraftDao draftDao;
     private final ImageDao imageDao;
     private final StyleDao styleDao;
+    private final TravelDao travelDao;
 
     @Value("${claude.api.key}")
     private String claudeApiKey;
@@ -226,6 +232,20 @@ public class ClaudeServiceImpl implements ClaudeService {
         }
         sb.append("카테고리: ").append(draft.getCategory()).append("\n");
 
+        // 연결된 여행 계획이 있으면 상세 데이터 추가
+        if (draft.getTripId() != null) {
+            try {
+                TravelTrip trip = travelDao.findTripById(draft.getTripId(), draft.getUserId());
+                if (trip != null) {
+                    List<TravelItinerary> itinerary = travelDao.findItineraryByTripId(trip.getId());
+                    List<TravelExpense> expenses = travelDao.findExpensesByTripId(trip.getId());
+                    sb.append(buildTripDataSection(trip, itinerary, expenses));
+                }
+            } catch (Exception e) {
+                log.warn("여행 계획 데이터 로딩 실패 (tripId={}): {}", draft.getTripId(), e.getMessage());
+            }
+        }
+
         if (!images.isEmpty()) {
             sb.append("\n업로드된 이미지 목록 (순서대로 [IMAGE_N] 플레이스홀더 사용):\n");
             for (int i = 0; i < images.size(); i++) {
@@ -242,6 +262,105 @@ public class ClaudeServiceImpl implements ClaudeService {
             sb.append("\n추가 요청사항: ").append(customInstructions).append("\n");
         }
 
+        return sb.toString();
+    }
+
+    private String buildTripDataSection(TravelTrip trip, List<TravelItinerary> itinerary, List<TravelExpense> expenses) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n=== 상세 여행 계획 데이터 (이 내용을 블로그에 풍부하게 녹여서 작성하세요) ===\n");
+
+        // 기간/인원/스타일
+        if (trip.getStartDate() != null && trip.getEndDate() != null) {
+            long nights = java.time.temporal.ChronoUnit.DAYS.between(trip.getStartDate(), trip.getEndDate());
+            sb.append(String.format("기간: %s ~ %s (%d박 %d일)\n", trip.getStartDate(), trip.getEndDate(), nights, nights + 1));
+        }
+        if (trip.getTravelers() != null) {
+            sb.append("인원: ").append(trip.getTravelers()).append("명\n");
+        }
+        if (trip.getTravelStyle() != null) {
+            sb.append("여행 스타일: ").append(trip.getTravelStyle()).append("\n");
+        }
+
+        // 날짜별 일정
+        if (!itinerary.isEmpty()) {
+            sb.append("\n[날짜별 일정]\n");
+            int currentDay = -1;
+            for (TravelItinerary item : itinerary) {
+                if (item.getDayNumber() != currentDay) {
+                    currentDay = item.getDayNumber();
+                    String dateStr = item.getDate() != null
+                        ? String.format(" (%s)", item.getDate())
+                        : "";
+                    sb.append(String.format("%d일차%s:\n", currentDay, dateStr));
+                }
+                String time = (item.getTimeStart() != null ? item.getTimeStart() : "")
+                    + (item.getTimeEnd() != null ? "~" + item.getTimeEnd() : "");
+                sb.append(String.format("  %s | %s | %s",
+                    time.isEmpty() ? "-" : time,
+                    item.getCategory() != null ? item.getCategory() : "기타",
+                    item.getActivity()));
+                if (item.getMemo() != null && !item.getMemo().isBlank()) {
+                    sb.append(" (").append(item.getMemo()).append(")");
+                }
+                sb.append("\n");
+            }
+        }
+
+        // 경비 요약
+        if (!expenses.isEmpty()) {
+            String currency = trip.getCurrency() != null ? trip.getCurrency() : "현지";
+            double totalLocal = expenses.stream().mapToDouble(e -> e.getAmount() != null ? e.getAmount().doubleValue() : 0).sum();
+            double totalKrw = expenses.stream().mapToDouble(e -> e.getAmountKrw() != null ? e.getAmountKrw().doubleValue() : 0).sum();
+            double perPersonLocal = expenses.stream().mapToDouble(e -> e.getAmountPerPerson() != null ? e.getAmountPerPerson().doubleValue() : 0).sum();
+            double perPersonKrw = expenses.stream().mapToDouble(e -> e.getAmountKrwPerPerson() != null ? e.getAmountKrwPerPerson().doubleValue() : 0).sum();
+
+            sb.append(String.format("\n[경비 요약]\n총 %s %.2f", currency, totalLocal));
+            if (totalKrw > 0) sb.append(String.format(" (약 ₩%,.0f)", totalKrw));
+            sb.append("\n");
+            if (perPersonLocal > 0) {
+                sb.append(String.format("1인 기준: %s %.2f", currency, perPersonLocal));
+                if (perPersonKrw > 0) sb.append(String.format(" (약 ₩%,.0f)", perPersonKrw));
+                sb.append("\n");
+            }
+
+            // 카테고리별 주요 지출 (식사 위주로 구체적 내역)
+            sb.append("\n[주요 지출 내역 - 블로그에 구체적으로 언급할 것]\n");
+            for (TravelExpense e : expenses) {
+                if (e.getItem() != null) {
+                    sb.append(String.format("  - %s", e.getItem()));
+                    if (e.getCategory() != null) sb.append(String.format(" [%s]", e.getCategory()));
+                    if (e.getAmount() != null && e.getAmount().doubleValue() > 0) {
+                        sb.append(String.format(" %s %.2f", currency, e.getAmount().doubleValue()));
+                    }
+                    if (e.getMemo() != null && !e.getMemo().isBlank()) sb.append(": ").append(e.getMemo());
+                    sb.append("\n");
+                }
+            }
+        }
+
+        // 각종 정보 요약 (있을 경우)
+        if (trip.getInfoContent() != null && !trip.getInfoContent().isBlank()) {
+            try {
+                ObjectMapper om = new ObjectMapper();
+                var infoList = om.readTree(trip.getInfoContent());
+                if (infoList.isArray() && infoList.size() > 0) {
+                    sb.append("\n[현지 여행 정보 - 블로그 팁으로 활용]\n");
+                    for (var node : infoList) {
+                        String title = node.path("title").asText("");
+                        String content = node.path("content").asText("");
+                        if (!title.isBlank()) {
+                            sb.append("▶ ").append(title).append("\n");
+                            if (!content.isBlank()) {
+                                // 너무 길면 200자만
+                                sb.append(content.length() > 200 ? content.substring(0, 200) + "..." : content).append("\n");
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        sb.append("=== 여행 계획 데이터 끝 ===\n");
         return sb.toString();
     }
 

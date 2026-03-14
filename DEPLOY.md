@@ -19,7 +19,6 @@
 - Java 17 Corretto (`~/Library/Java/JavaVirtualMachines/corretto-17.0.7`)
 - Maven (`/opt/homebrew/opt/maven/bin/mvn`)
 - Node.js / npm
-- 로컬 MySQL 8 (DBeaver로 관리)
 
 > 로컬 기본 Java가 11이므로 백엔드 실행/빌드 시 반드시 `JAVA_HOME` 명시
 
@@ -44,16 +43,12 @@ JAVA_HOME=~/Library/Java/JavaVirtualMachines/corretto-17.0.7/Contents/Home \
   -Dspring-boot.run.profiles=local
 ```
 
-확인: `http://localhost:8080/api/auth/login` → POST 요청 가능 여부
-
 ### 프론트엔드 실행
 
 ```bash
 cd /Users/shinsanha/Desktop/auto-blog/frontend
 npm run dev
 ```
-
-브라우저: `http://localhost:5173` → 로그인 페이지로 이동
 
 ---
 
@@ -68,16 +63,12 @@ JAVA_HOME=~/Library/Java/JavaVirtualMachines/corretto-17.0.7/Contents/Home \
 mvn clean package -DskipTests
 ```
 
-결과물: `backend/target/naver-blog-backend-0.0.1-SNAPSHOT.jar`
-
 ### 프론트엔드 빌드
 
 ```bash
 cd /Users/shinsanha/Desktop/auto-blog/frontend
 npm run build
 ```
-
-결과물: `frontend/dist/`
 
 ---
 
@@ -115,7 +106,7 @@ git push origin main
 | `DB_USERNAME` | TiDB 사용자명 |
 | `DB_PASSWORD` | TiDB 비밀번호 |
 | `CLAUDE_API_KEY` | Anthropic API 키 |
-| `GEMINI_API_KEY` | Google AI Studio 키 (무료, fallback) |
+| `GEMINI_API_KEY` | Google AI Studio 키 (무료, fallback + 여행 계획 생성) |
 | `JWT_SECRET` | 32자 이상 임의 문자열 (운영 환경 필수) |
 | `CORS_ORIGINS` | `https://frontend-blush-seven-53.vercel.app` |
 | `UPLOAD_DIR` | `/app/uploads` |
@@ -134,10 +125,12 @@ git push origin main
 - DB명: `naver_blog_auto`
 - **스키마 자동 실행 안됨** → 변경 시 TiDB 콘솔 SQL Editor에서 직접 실행
 
-#### 초기 테이블 생성 (신규 설치 시)
+---
+
+## DB 스키마 (전체 — 신규 설치 시)
 
 ```sql
--- 사용자 테이블
+-- 사용자
 CREATE TABLE users (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(50) NOT NULL UNIQUE,
@@ -145,7 +138,7 @@ CREATE TABLE users (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 스타일 참고 글 테이블
+-- 스타일 참고 글
 CREATE TABLE blog_style_samples (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT,
@@ -157,7 +150,7 @@ CREATE TABLE blog_style_samples (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 초안 테이블
+-- 초안
 CREATE TABLE blog_drafts (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT,
@@ -175,11 +168,12 @@ CREATE TABLE blog_drafts (
   generation_tokens INT DEFAULT 0,
   status VARCHAR(50) DEFAULT 'DRAFT',
   naver_post_url VARCHAR(500),
+  trip_id BIGINT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 이미지 테이블
+-- 이미지
 CREATE TABLE blog_images (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   draft_id BIGINT,
@@ -189,20 +183,112 @@ CREATE TABLE blog_images (
   ai_description TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 발행 히스토리
+CREATE TABLE post_history (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT,
+  draft_id BIGINT,
+  naver_post_url VARCHAR(500),
+  content_snapshot LONGTEXT,
+  image_count INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 여행 기본 정보
+CREATE TABLE travel_trips (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  destination VARCHAR(200) NOT NULL,
+  start_date DATE,
+  end_date DATE,
+  travelers INT DEFAULT 1,
+  budget_per_person DECIMAL(15,2),
+  travel_style TEXT,
+  currency VARCHAR(10) DEFAULT 'USD',
+  exchange_rate DECIMAL(10,2),
+  status VARCHAR(20) DEFAULT 'PLANNING',
+  info_content LONGTEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 여행 일정
+CREATE TABLE travel_itinerary (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  trip_id BIGINT NOT NULL,
+  day_number INT NOT NULL,
+  date DATE,
+  time_start VARCHAR(10),
+  time_end VARCHAR(10),
+  activity VARCHAR(500) NOT NULL,
+  category VARCHAR(50),
+  cost DECIMAL(10,2),
+  memo TEXT,
+  display_order INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 여행 체크리스트 (사전준비 / 서류 / 짐 싸기 공용)
+CREATE TABLE travel_checklist (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  trip_id BIGINT NOT NULL,
+  category VARCHAR(50) NOT NULL,   -- PRE_PREP, DOCUMENTS, PACKING
+  item VARCHAR(500) NOT NULL,
+  status VARCHAR(20) DEFAULT 'NOT_STARTED',  -- NOT_STARTED, IN_PROGRESS, DONE
+  display_order INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 여행 경비
+CREATE TABLE travel_expenses (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  trip_id BIGINT NOT NULL,
+  expense_date DATE,
+  item VARCHAR(500) NOT NULL,
+  category VARCHAR(50),
+  payment_method VARCHAR(50),
+  amount DECIMAL(10,2),
+  amount_krw DECIMAL(15,2),
+  amount_per_person DECIMAL(10,2),
+  amount_krw_per_person DECIMAL(15,2),
+  memo TEXT,
+  settled BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
-#### 기존 DB에 다중 사용자 마이그레이션
+---
+
+## DB 마이그레이션 (기존 DB 업그레이드)
+
+### 다중 사용자 추가 (v2)
 
 ```sql
 ALTER TABLE blog_drafts ADD COLUMN user_id BIGINT;
 ALTER TABLE blog_style_samples ADD COLUMN user_id BIGINT;
 
--- 기존 데이터를 첫 번째 유저에게 할당 (선택)
--- UPDATE blog_drafts SET user_id = 1 WHERE user_id IS NULL;
--- UPDATE blog_style_samples SET user_id = 1 WHERE user_id IS NULL;
+CREATE TABLE users (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(50) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
-### 크롬 익스텐션
+### 여행 플래너 추가 (v3)
+
+```sql
+-- blog_drafts에 여행 연결 컬럼 추가
+ALTER TABLE blog_drafts ADD COLUMN trip_id BIGINT;
+
+-- 여행 플래너 테이블 4개 생성 (위 전체 스키마의 travel_* 테이블 참고)
+```
+
+---
+
+## 크롬 익스텐션
 
 별도 빌드 불필요. `chrome-extension/` 폴더를 그대로 로드.
 
@@ -229,5 +315,6 @@ repo root/
 - **Render 무료 플랜**: 15분 비활성 시 슬립 → 첫 요청 50초+ 지연
 - **render.yaml vs 대시보드**: 기존 서비스는 대시보드 설정 우선
 - **schema.sql 자동 실행 안됨**: DB 스키마 변경 시 TiDB 콘솔에서 수동 실행
+- **CORS**: SecurityConfig에 `.cors(Customizer.withDefaults())` 필수 — 없으면 `/api/auth/**` 포함 모든 CORS 요청 403
 - **Cloudinary 미설정 시**: 이미지가 로컬 uploads에 저장 → Render 재배포 시 삭제됨
-- **JWT_SECRET 미설정 시**: 기본값(dev용)으로 동작하나 보안상 반드시 운영 키 설정 필요
+- **JWT_SECRET 미설정 시**: 기본값(dev용)으로 동작하나 보안상 반드시 운영 키 설정

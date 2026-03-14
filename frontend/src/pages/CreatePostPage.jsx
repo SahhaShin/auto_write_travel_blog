@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { imageApi } from '../api/imageApi';
 import { draftApi } from '../api/draftApi';
+import travelApi from '../api/travelApi';
 
 const CATEGORIES = ['여행', '맛집', '숙소', '카페', '기타'];
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
@@ -14,6 +15,8 @@ export default function CreatePostPage() {
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [trips, setTrips] = useState([]);
+  const [selectedTripId, setSelectedTripId] = useState('');
   const [form, setForm] = useState({
     destination: '',
     travelDates: '',
@@ -21,6 +24,24 @@ export default function CreatePostPage() {
     keyPoints: '',
     category: '여행',
   });
+
+  useEffect(() => {
+    travelApi.getTrips().then(setTrips).catch(() => {});
+  }, []);
+
+  const handleTripSelect = (tripId) => {
+    setSelectedTripId(tripId);
+    if (!tripId) return;
+    const trip = trips.find(t => String(t.id) === String(tripId));
+    if (!trip) return;
+    setForm(prev => ({
+      ...prev,
+      destination: trip.destination || prev.destination,
+      travelDates: trip.startDate && trip.endDate
+        ? `${trip.startDate} ~ ${trip.endDate}`
+        : prev.travelDates,
+    }));
+  };
 
   const onDrop = useCallback(async (acceptedFiles) => {
     setUploading(true);
@@ -71,6 +92,7 @@ export default function CreatePostPage() {
       const draft = await draftApi.create({
         ...form,
         images: uploadedImages,
+        tripId: selectedTripId ? Number(selectedTripId) : null,
       });
       navigate(`/editor/${draft.id}`);
     } catch (e) {
@@ -143,6 +165,41 @@ export default function CreatePostPage() {
             </div>
           )}
         </div>
+
+        {/* 여행 계획 연결 */}
+        {trips.length > 0 && (
+          <div className="card" style={{ borderLeft: '4px solid #2ecc71' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>여행 계획 연결 (선택)</h2>
+            <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+              내 여행 플래너의 일정·경비·정보를 AI가 블로그에 자동으로 반영합니다.
+            </p>
+            <select
+              value={selectedTripId}
+              onChange={e => handleTripSelect(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+            >
+              <option value="">연결 안 함 (직접 입력)</option>
+              {trips.map(trip => (
+                <option key={trip.id} value={trip.id}>
+                  {trip.title} — {trip.destination}
+                  {trip.startDate ? ` (${trip.startDate})` : ''}
+                </option>
+              ))}
+            </select>
+            {selectedTripId && (
+              <div style={{ marginTop: 10, padding: '8px 12px', background: '#f0fdf4', borderRadius: 6, fontSize: 12, color: '#166534' }}>
+                ✅ 일정·경비·여행 정보가 AI 글쓰기에 반영됩니다.
+                <button
+                  type="button"
+                  style={{ marginLeft: 12, background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 12 }}
+                  onClick={() => navigate(`/travel/${selectedTripId}`)}
+                >
+                  계획 보기 →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 여행 정보 입력 */}
         <div className="card">

@@ -228,7 +228,121 @@ ALTER TABLE blog_style_samples ADD COLUMN user_id BIGINT;
 
 ---
 
-## 현재 상태 (2026-03-11 기준)
+## 2026-03-14 | CORS 버그 수정 + 여행 플래너 기능 추가 + 블로그 연동
+
+### 1. CORS 403 버그 수정
+
+**원인**: Spring Boot 3.x에서 `WebMvcConfigurer`의 CORS 설정이 Spring Security 필터 체인에 자동 적용되지 않음.
+`/api/auth/register` 등 `permitAll()` 엔드포인트도 CORS preflight에서 403 반환.
+
+**수정 파일**: `SecurityConfig.java`
+```java
+http.cors(Customizer.withDefaults())  // 이 한 줄 추가
+    .csrf(AbstractHttpConfigurer::disable)
+    ...
+```
+
+---
+
+### 2. 여행 플래너 기능 추가
+
+#### 신규 백엔드 파일
+
+| 파일 | 내용 |
+|------|------|
+| `TravelTrip.java` | 여행 기본 정보 DTO |
+| `TravelItinerary.java` | 날짜별 일정 DTO |
+| `TravelChecklist.java` | 사전준비/서류/짐 체크리스트 DTO |
+| `TravelExpense.java` | 경비 내역 DTO (현지통화 + 원화 + 1인기준) |
+| `TravelDao.java` | 여행 플래너 통합 MyBatis DAO |
+| `TravelMapper.xml` | 여행 플래너 통합 SQL 매퍼 |
+| `TravelServiceImpl.java` | AI 여행 계획 생성 (Gemini 2.5-flash) + CRUD |
+| `TravelController.java` | `/api/travel/**` 전체 REST API |
+
+#### 신규 프론트엔드 파일
+
+| 파일 | 내용 |
+|------|------|
+| `travelApi.js` | 여행 플래너 API 모듈 |
+| `TravelListPage.jsx` | 여행 목록 (카드 + D-day 표시) |
+| `TravelCreatePage.jsx` | 새 여행 생성 (AI 자동 / 기존 계획 완성) |
+| `TravelDetailPage.jsx` | 여행 상세 6탭 (사전준비 보드 / 일정 / 서류 / 짐 / 경비 / 각종정보) |
+
+#### 여행 플래너 주요 기능
+
+- **AI 자동 생성**: 여행지/기간/인원/스타일/예산 입력 → Gemini가 일정+체크리스트+짐목록+현지정보 JSON 생성
+- **기존 계획 완성**: 부분 계획 텍스트 입력 → AI가 빈 부분 채워줌
+- **AI 빈 시간 채우기**: 일정 탭에서 기존 일정 분석 → 빈 시간대 추천
+- **경비 관리**: 현지 통화 + 원화 환산 + 1인 기준 자동 계산 (환율 기반)
+- **사전 준비 보드**: Not Started / In Progress / Done 3컬럼 보드, 클릭으로 상태 이동
+- **체크리스트**: 서류 준비 / 짐 싸기 프로그레스 바 포함
+
+#### DB 마이그레이션
+
+```sql
+CREATE TABLE travel_trips (...);
+CREATE TABLE travel_itinerary (...);
+CREATE TABLE travel_checklist (...);
+CREATE TABLE travel_expenses (...);
+```
+
+---
+
+### 3. 여행 플래너 ↔ 블로그 글쓰기 연동
+
+**핵심**: 여행 플래너에서 확정된 계획을 AI 블로그 생성 시 자동으로 프롬프트에 반영.
+
+#### 변경된 파일
+
+| 파일 | 변경 |
+|------|------|
+| `BlogDraft.java` | `tripId` 필드 추가 |
+| `DraftMapper.xml` | `trip_id` 컬럼 INSERT/SELECT 반영 |
+| `ClaudeServiceImpl.java` | `TravelDao` 주입, `buildTripDataSection()` 추가 |
+| `CreatePostPage.jsx` | "여행 계획 연결" 드롭다운 UI 추가 |
+
+#### DB 마이그레이션
+
+```sql
+ALTER TABLE blog_drafts ADD COLUMN trip_id BIGINT;
+```
+
+#### AI 프롬프트에 추가되는 내용 (여행 연결 시)
+
+```
+=== 상세 여행 계획 데이터 ===
+기간: 2024-09-17 ~ 2024-09-24 (7박 8일) / 인원: 2명
+여행 스타일: 맛집 탐방, 감성 카페
+
+[날짜별 일정]
+1일차 (2024-09-17):
+  22:10~24:00 | 항공 | 인천 → 시드니 이동 (입국심사서 작성)
+...
+
+[경비 요약]
+총 AUD 1,595.07 (약 ₩1,435,563)
+1인 기준: AUD 797.54 (약 ₩717,786)
+
+[주요 지출 내역]
+  - 시드니 락사 [식사] AUD 42.60: 드럼스틱 치킨 락사 1개...
+  - The baxter inn [식사] AUD 30.52: 애플 위스키...
+
+[현지 여행 정보]
+▶ 입국 정보 / ▶ 환율 정보 / ...
+```
+
+---
+
+### 4. md 파일 전면 업데이트
+
+- `README.md`: 여행 플래너 기능, 연동 흐름, 전체 API, 새 파일 구조 반영
+- `DEPLOY.md`: 전체 DB 스키마 (여행 플래너 4개 테이블 포함), 마이그레이션 SQL, CORS 주의사항 추가
+- `CLAUDE.md`: 프로젝트 구조, 주의사항 업데이트
+- `history.md`: 이번 변경 이력 추가
+
+---
+
+## 현재 상태 (2026-03-14 기준)
 
 | 기능 | 상태 |
 |------|------|
@@ -240,6 +354,9 @@ ALTER TABLE blog_style_samples ADD COLUMN user_id BIGINT;
 | 크롬 익스텐션 본문 삽입 | 완료 (제목은 사용자 직접 입력) |
 | 초안 삭제 | 완료 |
 | Selenium 자동 발행 | 제거 (크롬 익스텐션으로 대체) |
+| CORS 403 버그 수정 | 완료 |
+| 여행 플래너 (AI 계획 생성 + 6탭 관리) | 완료 |
+| 여행 플래너 ↔ 블로그 글쓰기 연동 | 완료 |
 | 프로덕션 배포 (Vercel + Render + TiDB) | 완료 |
 
 ---

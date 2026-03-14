@@ -34,6 +34,9 @@ public class BlogDraft {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    // 연결된 여행 계획 ID (선택)
+    private Long tripId;
+
     // 조회 시 연결된 이미지 목록 (JOIN)
     private List<BlogImage> images;
 }

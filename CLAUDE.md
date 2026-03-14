@@ -5,6 +5,7 @@
 기존 네이버 블로그 글의 문체를 AI가 학습하여, 이미지와 여행 계획 입력만으로 동일 스타일의 블로그 초안을 자동 생성하는 풀스택 웹앱.
 생성된 초안은 크롬 익스텐션으로 네이버 블로그 글쓰기 페이지에 삽입. 제목은 사용자가 직접 입력 후 발행.
 다중 사용자 지원: 회원가입/로그인 후 각자의 데이터만 접근 가능.
+여행 플래너: AI(Gemini 2.5-flash)로 여행 계획 자동 생성 및 관리. 확정된 계획을 블로그 글쓰기에 자동 연동.
 
 ---
 
@@ -39,39 +40,52 @@ auto-blog/
 │   └── src/main/
 │       ├── java/com/shincha/naverblog/
 │       │   ├── config/
-│       │   │   ├── SecurityConfig.java   # Spring Security + BCryptPasswordEncoder @Bean
-│       │   │   └── WebConfig.java        # CORS
+│       │   │   ├── SecurityConfig.java   # Spring Security + cors(Customizer.withDefaults()) + BCrypt
+│       │   │   └── WebConfig.java        # CORS allowedOriginPatterns
 │       │   ├── security/
-│       │   │   └── JwtFilter.java        # Authorization 헤더 파싱, principal = userId(Long)
+│       │   │   └── JwtFilter.java
 │       │   ├── util/
-│       │   │   └── JwtUtil.java          # generate(userId, username), extractUserId, isValid
+│       │   │   └── JwtUtil.java
 │       │   ├── controller/
-│       │   │   ├── AuthController.java   # POST /api/auth/register, /api/auth/login
+│       │   │   ├── AuthController.java
 │       │   │   ├── DraftController.java
 │       │   │   ├── StyleController.java
 │       │   │   ├── GenerateController.java
 │       │   │   ├── ImageController.java
-│       │   │   └── PostController.java
+│       │   │   ├── PostController.java
+│       │   │   └── TravelController.java  # /api/travel/** 여행 플래너 전체
 │       │   └── model/
-│       │       ├── dto/         # User, BlogDraft, BlogStyleSample, BlogImage, PostHistory
-│       │       ├── dao/         # UserDao, DraftDao, StyleDao, ImageDao, PostHistoryDao
-│       │       └── service/     # ClaudeServiceImpl, StyleServiceImpl, DraftServiceImpl, ImageServiceImpl
+│       │       ├── dto/
+│       │       │   ├── User, BlogDraft(+tripId), BlogStyleSample, BlogImage, PostHistory
+│       │       │   └── TravelTrip, TravelItinerary, TravelChecklist, TravelExpense
+│       │       ├── dao/
+│       │       │   ├── UserDao, DraftDao, StyleDao, ImageDao, PostHistoryDao
+│       │       │   └── TravelDao          # 여행 플래너 통합 DAO
+│       │       └── service/
+│       │           ├── ClaudeServiceImpl  # TravelDao 주입, buildTripDataSection()
+│       │           ├── StyleServiceImpl, DraftServiceImpl, ImageServiceImpl
+│       │           └── TravelServiceImpl  # Gemini AI 계획 생성 + CRUD
 │       └── resources/
 │           ├── application.properties
-│           ├── application-local.properties  # gitignore, 로컬 전용
-│           └── mappers/         # UserMapper, DraftMapper, StyleMapper, ImageMapper, PostHistoryMapper
+│           ├── application-local.properties  # gitignore
+│           └── mappers/
+│               ├── UserMapper, DraftMapper, StyleMapper, ImageMapper, PostHistoryMapper
+│               └── TravelMapper.xml       # 여행 플래너 통합 매퍼
 └── frontend/
     ├── src/
     │   ├── api/
-    │   │   ├── axiosClient.js   # 요청 인터셉터(JWT 첨부) + 응답 인터셉터(401→/login)
-    │   │   └── ...              # styleApi, draftApi, imageApi, generateApi, postApi
+    │   │   ├── axiosClient.js
+    │   │   ├── styleApi, draftApi, imageApi, generateApi, postApi
+    │   │   └── travelApi.js               # 여행 플래너 API
     │   └── pages/
-    │       ├── LoginPage.jsx
-    │       ├── RegisterPage.jsx
-    │       ├── CreatePostPage.jsx
+    │       ├── LoginPage.jsx, RegisterPage.jsx
+    │       ├── CreatePostPage.jsx          # 여행 계획 연결 드롭다운 포함
     │       ├── EditorPage.jsx
     │       ├── StyleReferencePage.jsx
-    │       └── HistoryPage.jsx
+    │       ├── HistoryPage.jsx
+    │       ├── TravelListPage.jsx          # 여행 목록
+    │       ├── TravelCreatePage.jsx        # 새 여행 생성 (AI / 계획 완성)
+    │       └── TravelDetailPage.jsx        # 6탭 상세 관리
     ├── vercel.json
     └── package.json
 ```
@@ -185,3 +199,6 @@ vercel --prod --yes
 - **Cloudinary**: 이미지 영구 저장. 미설정 시 로컬 uploads에 저장 (Render 재배포 시 삭제됨)
 - **크롬 익스텐션**: 제목은 SmartEditor ONE API 접근 불가로 사용자가 직접 입력. 본문만 자동 삽입
 - **데이터 격리**: 모든 조회/생성 API는 JWT의 userId 기반으로 자신의 데이터만 접근 가능
+- **CORS**: SecurityConfig에 반드시 `.cors(Customizer.withDefaults())` 추가. 없으면 `/api/auth/**` 포함 모든 CORS 요청 403 오류
+- **여행 플래너 AI**: Gemini 2.5-flash 사용 (무료). `GEMINI_API_KEY` 환경변수 필수
+- **여행 계획 연동**: `blog_drafts.trip_id` → `TravelDao`로 일정/경비/정보 조회 → 프롬프트 자동 삽입
