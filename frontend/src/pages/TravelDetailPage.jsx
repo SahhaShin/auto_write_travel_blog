@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import travelApi from '../api/travelApi';
 import TravelMap from '../components/TravelMap';
@@ -151,6 +151,11 @@ function ItineraryTab({ trip, items, onChange }) {
   const formRow = (
     <tr style={{ background: '#f0fdf4' }}>
       <td style={s.td}>
+        <select style={s.inputSm} value={form.dayNumber} onChange={e => setForm(p => ({ ...p, dayNumber: Number(e.target.value) }))}>
+          {days.map(d => <option key={d} value={d}>{d}일차</option>)}
+        </select>
+      </td>
+      <td style={s.td}>
         <input style={s.inputSm} placeholder="09:00" value={form.timeStart} onChange={e => setForm(p => ({ ...p, timeStart: e.target.value }))} />
         <span style={{ margin: '0 2px', color: '#aaa' }}>~</span>
         <input style={s.inputSm} placeholder="10:00" value={form.timeEnd} onChange={e => setForm(p => ({ ...p, timeEnd: e.target.value }))} />
@@ -213,6 +218,7 @@ function ItineraryTab({ trip, items, onChange }) {
         <table style={s.table}>
           <thead>
             <tr style={{ background: '#f9fafb' }}>
+              <th style={s.th}>일차</th>
               <th style={s.th}>시간</th>
               <th style={s.th}>일정</th>
               <th style={s.th}>카테고리</th>
@@ -221,14 +227,16 @@ function ItineraryTab({ trip, items, onChange }) {
             </tr>
           </thead>
           <tbody>
-            {adding && formRow}
             {days.map(day => {
-              const dayItems = items.filter(i => i.dayNumber === day);
+              const dayItems = items
+                .filter(i => i.dayNumber === day)
+                .sort((a, b) => (a.timeStart || '').localeCompare(b.timeStart || ''));
               const dateStr = trip.startDate
                 ? new Date(new Date(trip.startDate).getTime() + (day - 1) * 86400000)
                     .toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' })
                 : null;
-              if (dayItems.length === 0 && !adding) return null;
+              const showFormHere = adding && form.dayNumber === day;
+              if (dayItems.length === 0 && !showFormHere) return null;
               return [
                 <tr key={`day-${day}`}>
                   <td colSpan={7} style={s.dayHeader}>
@@ -236,6 +244,7 @@ function ItineraryTab({ trip, items, onChange }) {
                     {dateStr && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>{dateStr}</span>}
                   </td>
                 </tr>,
+                ...(showFormHere ? [<React.Fragment key="formRow">{formRow}</React.Fragment>] : []),
                 ...dayItems.map(item =>
                   editId === item.id ? (
                     <tr key={item.id} style={{ background: '#f0fdf4' }}>
