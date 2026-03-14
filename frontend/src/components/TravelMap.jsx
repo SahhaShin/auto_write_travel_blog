@@ -95,13 +95,20 @@ export default function TravelMap({ trip, items, highlightActivity }) {
       let done = 0;
       for (const item of unique) {
         if (cancelRef.current) return;
-        // 주소 직접 입력된 경우 주소로 geocoding, 없으면 활동명+여행지로 시도
-        const query = item.address?.trim() || `${item.activity}, ${trip.destination}`;
-        const coord = await geocode(query);
+
+        let coord = null;
+        if (item.lat && item.lng) {
+          // 위도/경도 직접 입력된 경우 바로 사용 (geocoding 불필요)
+          coord = [Number(item.lat), Number(item.lng)];
+        } else {
+          // 없으면 활동명+여행지로 Nominatim geocoding 시도
+          coord = await geocode(`${item.activity}, ${trip.destination}`);
+          await sleep(1100);
+        }
+
         done++;
         setLoadingText(`마커 추가 중 (${done} / ${unique.length})`);
         if (coord && !cancelRef.current) {
-          // 목적지 geocoding 실패 시 첫 번째 마커 좌표를 center로 사용
           setCenter(prev => prev || coord);
           setMarkers(prev => [...prev, {
             lat: coord[0], lng: coord[1],
@@ -112,7 +119,6 @@ export default function TravelMap({ trip, items, highlightActivity }) {
             category: item.category || '기타',
           }]);
         }
-        await sleep(1100);
       }
       if (!cancelRef.current) setLoadingText('');
     }
