@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import travelApi from '../api/travelApi';
+import TravelMap from '../components/TravelMap';
 
 const TABS = ['사전 준비', '여행 일정', '서류 준비', '짐 싸기', '경비', '각종 정보'];
 const CATEGORIES_ITINERARY = ['교통', '식사', '활동', '항공', '숙소', '기타'];
@@ -179,22 +180,10 @@ function ItineraryTab({ trip, items, onChange }) {
     </tr>
   );
 
-  const mapQuery = encodeURIComponent(trip.destination || '');
-
   return (
     <div>
-      {/* 구글 지도 */}
-      <div style={{ borderRadius: 10, overflow: 'hidden', marginBottom: 20, border: '1px solid #e5e7eb' }}>
-        <iframe
-          title="map"
-          src={`https://maps.google.com/maps?q=${mapQuery}&output=embed&hl=ko`}
-          width="100%"
-          height="260"
-          style={{ border: 'none', display: 'block' }}
-          loading="lazy"
-          allowFullScreen
-        />
-      </div>
+      {/* 지도 — 일정 마커 표시 */}
+      <TravelMap trip={trip} items={items} />
 
       {/* AI 자연어 일정 추가 */}
       <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 10, padding: 16, marginBottom: 16 }}>

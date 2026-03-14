@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import axiosClient from '../api/axiosClient';
 
 export default function LoginPage() {
@@ -7,6 +8,22 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data } = await axiosClient.post('/api/auth/google', {
+        idToken: credentialResponse.credential,
+      });
+      localStorage.setItem('token', data.token);
+      navigate('/');
+    } catch (e) {
+      setError('Google 로그인에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -78,6 +95,23 @@ export default function LoginPage() {
             {loading ? <span className="spinner" /> : '로그인'}
           </button>
         </form>
+
+        <div style={{ margin: '20px 0', textAlign: 'center', position: 'relative' }}>
+          <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb' }} />
+          <span style={{
+            position: 'absolute', top: -9, left: '50%', transform: 'translateX(-50%)',
+            background: 'white', padding: '0 10px', fontSize: 12, color: '#9ca3af',
+          }}>또는</span>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => setError('Google 로그인에 실패했습니다.')}
+            text="signin_with"
+            locale="ko"
+          />
+        </div>
 
         <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: '#888' }}>
           계정이 없으신가요?{' '}
