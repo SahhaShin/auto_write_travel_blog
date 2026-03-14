@@ -13,7 +13,7 @@ const makeIcon = (color, day) => L.divIcon({
   html: `<div style="width:28px;height:28px;background:${color};border-radius:50%;
     border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35);
     display:flex;align-items:center;justify-content:center;
-    color:white;font-size:11px;font-weight:700">${day}</div>`,
+    color:white;font-size:11px;font-weight:700;line-height:1">${day}</div>`,
   iconSize: [28, 28],
   iconAnchor: [14, 14],
   popupAnchor: [0, -16],
@@ -42,11 +42,29 @@ function FitBounds({ markers }) {
   return null;
 }
 
-export default function TravelMap({ trip, items }) {
+// 특정 활동으로 지도 이동 + 팝업 열기
+function MapController({ highlightActivity, markers, markerRefs }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!highlightActivity) return;
+    const target = markers.find(m => m.activity === highlightActivity);
+    if (target) {
+      map.flyTo([target.lat, target.lng], 16, { duration: 1 });
+      setTimeout(() => {
+        const ref = markerRefs.current[highlightActivity];
+        if (ref) ref.openPopup();
+      }, 1100);
+    }
+  }, [highlightActivity]);
+  return null;
+}
+
+export default function TravelMap({ trip, items, highlightActivity }) {
   const [center, setCenter] = useState(null);
   const [markers, setMarkers] = useState([]);
   const [loadingText, setLoadingText] = useState('지도 로딩 중...');
   const cancelRef = useRef(false);
+  const markerRefs = useRef({});
 
   useEffect(() => {
     cancelRef.current = false;
@@ -64,7 +82,6 @@ export default function TravelMap({ trip, items }) {
       const filtered = items.filter(i =>
         !['교통', '항공'].includes(i.category) && i.activity?.trim().length > 1
       );
-      // 일차+활동명 기준 중복 제거
       const seen = new Set();
       const unique = filtered.filter(i => {
         const k = i.activity.trim();
@@ -82,6 +99,8 @@ export default function TravelMap({ trip, items }) {
         done++;
         setLoadingText(`마커 추가 중 (${done} / ${unique.length})`);
         if (coord && !cancelRef.current) {
+          // 목적지 geocoding 실패 시 첫 번째 마커 좌표를 center로 사용
+          setCenter(prev => prev || coord);
           setMarkers(prev => [...prev, {
             lat: coord[0], lng: coord[1],
             activity: item.activity,
@@ -102,6 +121,9 @@ export default function TravelMap({ trip, items }) {
 
   return (
     <div style={{ borderRadius: 10, overflow: 'hidden', marginBottom: 20, border: '1px solid #e5e7eb', position: 'relative' }}>
+      {/* leaflet-div-icon 기본 흰 배경·테두리 제거 */}
+      <style>{`.leaflet-div-icon { background: transparent !important; border: none !important; }`}</style>
+
       {loadingText && (
         <div style={{
           position: 'absolute', top: 10, right: 10, zIndex: 1000,
@@ -118,9 +140,18 @@ export default function TravelMap({ trip, items }) {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <FitBounds markers={markers} />
+          <MapController
+            highlightActivity={highlightActivity}
+            markers={markers}
+            markerRefs={markerRefs}
+          />
           {markers.map((m, idx) => (
-            <Marker key={idx} position={[m.lat, m.lng]}
-              icon={makeIcon(CAT_COLOR[m.category] || '#6b7280', m.dayNumber)}>
+            <Marker
+              key={idx}
+              position={[m.lat, m.lng]}
+              icon={makeIcon(CAT_COLOR[m.category] || '#6b7280', m.dayNumber)}
+              ref={el => { if (el) markerRefs.current[m.activity] = el; }}
+            >
               <Popup>
                 <div style={{ minWidth: 120 }}>
                   <div style={{ fontWeight: 700, marginBottom: 2 }}>{m.activity}</div>

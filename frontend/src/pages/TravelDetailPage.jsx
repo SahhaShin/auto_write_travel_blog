@@ -84,6 +84,7 @@ function ItineraryTab({ trip, items, onChange }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [parseText, setParseText] = useState('');
   const [parseLoading, setParseLoading] = useState(false);
+  const [highlightActivity, setHighlightActivity] = useState(null);
   const [form, setForm] = useState({ dayNumber: 1, timeStart: '', timeEnd: '', activity: '', category: '활동', cost: '', memo: '' });
 
   const totalDays = trip.startDate && trip.endDate
@@ -183,7 +184,7 @@ function ItineraryTab({ trip, items, onChange }) {
   return (
     <div>
       {/* 지도 — 일정 마커 표시 */}
-      <TravelMap trip={trip} items={items} />
+      <TravelMap trip={trip} items={items} highlightActivity={highlightActivity} />
 
       {/* AI 자연어 일정 추가 */}
       <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 10, padding: 16, marginBottom: 16 }}>
@@ -283,7 +284,13 @@ function ItineraryTab({ trip, items, onChange }) {
                       <td style={{ ...s.td, fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>
                         {item.timeStart && item.timeEnd ? `${item.timeStart}~${item.timeEnd}` : item.timeStart || '-'}
                       </td>
-                      <td style={{ ...s.td, fontWeight: 500 }}>{item.activity}</td>
+                      <td
+                        style={{ ...s.td, fontWeight: 500, cursor: 'pointer', color: '#2563eb' }}
+                        onClick={() => setHighlightActivity(item.activity)}
+                        title="지도에서 보기"
+                      >
+                        {item.activity}
+                      </td>
                       <td style={s.td}>
                         <span style={{ ...s.catBadge, background: categoryColor[item.category] || '#6b7280' }}>
                           {item.category}
