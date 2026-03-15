@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import travelApi from '../api/travelApi';
 import TravelMap from '../components/TravelMap';
 
@@ -133,6 +134,84 @@ function ItineraryTab({ trip, items, onChange }) {
     }
   };
 
+  const exportToExcel = () => {
+    const rows = [['일차', '날짜', '시간', '일정', '카테고리', '비고']];
+    days.forEach(day => {
+      const dayItems = items
+        .filter(i => i.dayNumber === day)
+        .sort((a, b) => (a.timeStart || '').localeCompare(b.timeStart || ''));
+      if (dayItems.length === 0) return;
+      const dateStr = trip.startDate
+        ? new Date(new Date(trip.startDate).getTime() + (day - 1) * 86400000)
+            .toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' })
+        : '';
+      dayItems.forEach(item => {
+        rows.push([
+          `${day}일차`,
+          dateStr,
+          item.timeStart && item.timeEnd ? `${item.timeStart}~${item.timeEnd}` : item.timeStart || '',
+          item.activity,
+          item.category || '',
+          item.memo || '',
+        ]);
+      });
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 8 }, { wch: 14 }, { wch: 13 }, { wch: 30 }, { wch: 10 }, { wch: 20 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '여행 일정');
+    XLSX.writeFile(wb, `${trip.destination || trip.title}_일정.xlsx`);
+  };
+
+  const exportToPdf = () => {
+    const rows = days.map(day => {
+      const dayItems = items
+        .filter(i => i.dayNumber === day)
+        .sort((a, b) => (a.timeStart || '').localeCompare(b.timeStart || ''));
+      if (dayItems.length === 0) return '';
+      const dateStr = trip.startDate
+        ? new Date(new Date(trip.startDate).getTime() + (day - 1) * 86400000)
+            .toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' })
+        : '';
+      return `
+        <tr><td colspan="4" style="background:#f59e0b;color:#fff;font-weight:700;padding:6px 10px;">${day}일차${dateStr ? ' · ' + dateStr : ''}</td></tr>
+        ${dayItems.map(item => `
+          <tr>
+            <td style="white-space:nowrap;color:#6b7280;">${item.timeStart && item.timeEnd ? item.timeStart + '~' + item.timeEnd : item.timeStart || '-'}</td>
+            <td style="font-weight:500;">${item.activity}</td>
+            <td><span style="background:${categoryColor[item.category] || '#6b7280'};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">${item.category || ''}</span></td>
+            <td style="color:#6b7280;font-size:12px;">${item.memo || '-'}</td>
+          </tr>
+        `).join('')}
+      `;
+    }).join('');
+    const html = `<!DOCTYPE html>
+<html><head>
+  <meta charset="utf-8">
+  <title>${trip.title} 여행 일정</title>
+  <style>
+    body { font-family: -apple-system, 'Apple SD Gothic Neo', sans-serif; padding: 30px; color: #1f2937; }
+    h1 { font-size: 22px; margin: 0 0 6px; }
+    .sub { font-size: 13px; color: #6b7280; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #2ecc71; color: #fff; padding: 8px 10px; text-align: left; }
+    td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+    @media print { @page { margin: 20mm; } }
+  </style>
+</head><body>
+  <h1>${trip.title}</h1>
+  <div class="sub">📍 ${trip.destination || ''}${trip.startDate ? ' · ' + trip.startDate + ' ~ ' + trip.endDate : ''}</div>
+  <table>
+    <thead><tr><th>시간</th><th>일정</th><th>카테고리</th><th>비고</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+</body></html>`;
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => win.print(), 500);
+  };
+
   const handleParseText = async () => {
     if (!parseText.trim()) return;
     setParseLoading(true);
@@ -208,6 +287,8 @@ function ItineraryTab({ trip, items, onChange }) {
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, justifyContent: 'flex-end' }}>
+        <button style={s.exportBtn} onClick={exportToExcel} title="Excel로 저장">📊 Excel</button>
+        <button style={s.exportBtn} onClick={exportToPdf} title="PDF로 저장">🖨️ PDF</button>
         <button style={s.aiBtn} onClick={handleFillGaps} disabled={aiLoading}>
           {aiLoading ? '분석 중...' : '✨ AI 빈 시간 채우기'}
         </button>
@@ -700,6 +781,7 @@ export default function TravelDetailPage() {
 const s = {
   input: { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' },
   inputSm: { padding: '4px 6px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 },
+  exportBtn: { padding: '8px 14px', background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' },
   addBtn: { padding: '8px 16px', background: '#2ecc71', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' },
   aiBtn: { padding: '8px 16px', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' },
   saveBtn: { padding: '4px 10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, marginRight: 4 },
