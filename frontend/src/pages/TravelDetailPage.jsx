@@ -179,7 +179,7 @@ function ItineraryTab({ trip, items, onChange }) {
           <tr>
             <td style="white-space:nowrap;color:#6b7280;">${item.timeStart && item.timeEnd ? item.timeStart + '~' + item.timeEnd : item.timeStart || '-'}</td>
             <td style="font-weight:500;">${item.activity}</td>
-            <td><span style="background:${categoryColor[item.category] || '#6b7280'};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">${item.category || ''}</span></td>
+            <td style="white-space:nowrap;"><span style="background:${categoryColor[item.category] || '#6b7280'};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap;">${item.category || ''}</span></td>
             <td style="color:#6b7280;font-size:12px;">${item.memo || '-'}</td>
           </tr>
         `).join('')}
